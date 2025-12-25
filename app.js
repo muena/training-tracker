@@ -718,15 +718,22 @@ function renderWeeklyChart(weeklyData) {
                 y: { 
                     type: 'linear', position: 'left', 
                     ticks: { color: '#3b82f6', stepSize: 1 }, 
-                    grid: { color: 'rgba(51, 65, 85, 0.3)' }
+                    grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                    title: { display: true, text: 'Anzahl Workouts', color: '#3b82f6' }
                 },
                 y1: { 
                     type: 'linear', position: 'right', 
                     ticks: { color: '#10b981' }, 
-                    grid: { display: false }
+                    grid: { display: false },
+                    title: { display: true, text: 'Volumen (Tonnen)', color: '#10b981' }
                 }
             },
-            plugins: { legend: { display: false } } // Platz sparen
+            plugins: { 
+                legend: { 
+                    display: true,
+                    labels: { color: '#94a3b8' }
+                } 
+            }
         }
     });
 }
@@ -814,7 +821,6 @@ function renderProgressChart(progression) {
     }
     
     if (!progression || progression.length === 0) {
-        // Optional: Leeren Chart anzeigen oder Nachricht
         return;
     }
     
@@ -824,7 +830,10 @@ function renderProgressChart(progression) {
     });
     
     const weights = progression.map(p => p.max_weight);
+    const avgWeights = progression.map(p => Math.round(p.avg_weight * 10) / 10);
     const volumes = progression.map(p => Math.round(p.total_volume));
+    const avgReps = progression.map(p => Math.round(p.avg_reps * 10) / 10);
+    const setCounts = progression.map(p => p.set_count);
     
     progressChart = new Chart(ctx, {
         type: 'line',
@@ -837,17 +846,55 @@ function renderProgressChart(progression) {
                     borderColor: '#3b82f6',
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',
                     tension: 0.3,
-                    fill: true,
-                    yAxisID: 'y'
+                    fill: false,
+                    yAxisID: 'y',
+                    order: 1
+                },
+                {
+                    label: 'Ø Gewicht (kg)',
+                    data: avgWeights,
+                    borderColor: '#60a5fa',
+                    borderDash: [5, 5],
+                    backgroundColor: 'transparent',
+                    pointRadius: 0,
+                    tension: 0.3,
+                    fill: false,
+                    yAxisID: 'y',
+                    order: 2
                 },
                 {
                     label: 'Volumen (kg)',
                     data: volumes,
                     borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.05)',
                     tension: 0.3,
                     fill: true,
-                    yAxisID: 'y1'
+                    yAxisID: 'y1',
+                    order: 5 // Ganz hinten
+                },
+                {
+                    label: 'Ø Wdh.',
+                    data: avgReps,
+                    type: 'bar',
+                    backgroundColor: 'rgba(148, 163, 184, 0.5)',
+                    borderColor: 'rgba(148, 163, 184, 0.8)',
+                    borderWidth: 1,
+                    barPercentage: 0.5,
+                    yAxisID: 'y2',
+                    order: 3
+                },
+                {
+                    label: 'Sätze',
+                    data: setCounts,
+                    type: 'line',
+                    borderColor: '#f59e0b', // Orange/Amber
+                    backgroundColor: '#f59e0b',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    tension: 0, // Eckig/Direkt
+                    fill: false,
+                    yAxisID: 'y2',
+                    order: 4
                 }
             ]
         },
@@ -860,9 +907,32 @@ function renderProgressChart(progression) {
             },
             plugins: {
                 legend: {
+                    display: true,
                     labels: {
                         color: '#94a3b8',
-                        font: { size: 12 }
+                        font: { size: 11 },
+                        usePointStyle: true,
+                        boxWidth: 8
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    titleColor: '#f8fafc',
+                    bodyColor: '#cbd5e1',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    padding: 10,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y;
+                            }
+                            return label;
+                        }
                     }
                 }
             },
@@ -876,12 +946,8 @@ function renderProgressChart(progression) {
                     display: true,
                     position: 'left',
                     ticks: { color: '#3b82f6' },
-                    grid: { color: 'rgba(51, 65, 85, 0.5)' },
-                    title: {
-                        display: true,
-                        text: 'Gewicht (kg)',
-                        color: '#3b82f6'
-                    }
+                    grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                    title: { display: true, text: 'Gewicht (kg)', color: '#3b82f6', font: { size: 10 } }
                 },
                 y1: {
                     type: 'linear',
@@ -889,11 +955,17 @@ function renderProgressChart(progression) {
                     position: 'right',
                     ticks: { color: '#10b981' },
                     grid: { drawOnChartArea: false },
-                    title: {
-                        display: true,
-                        text: 'Volumen (kg)',
-                        color: '#10b981'
-                    }
+                    title: { display: true, text: 'Volumen', color: '#10b981', font: { size: 10 } }
+                },
+                y2: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    ticks: { color: '#94a3b8' },
+                    title: { display: true, text: 'Wdh. / Sätze', color: '#94a3b8', font: { size: 10 } },
+                    // Skala anpassen, damit Sätze/Reps gut sichtbar sind (z.B. min 0)
+                    min: 0
                 }
             }
         }

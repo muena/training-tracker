@@ -188,6 +188,7 @@ const getWeightProgressionForExerciseStmt = db.prepare(`
         w.date as workout_date,
         MAX(s.weight) as max_weight,
         AVG(s.weight) as avg_weight,
+        AVG(s.reps) as avg_reps,
         SUM(s.weight * s.reps) as total_volume,
         COUNT(s.id) as set_count
     FROM sets s
