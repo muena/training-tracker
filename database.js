@@ -192,38 +192,47 @@ const getWeightProgressionForExerciseStmt = db.prepare(`
         COUNT(s.id) as set_count
     FROM sets s
     JOIN workouts w ON s.workout_id = w.id
-    WHERE s.exercise_id = ?
+    WHERE s.exercise_id = ? AND w.date >= ?
     GROUP BY w.id
     ORDER BY w.date
 `);
 
-const getOverallStatsStmt = db.prepare(`
+const getDetailedStatsStmt = db.prepare(`
     SELECT 
         COUNT(DISTINCT w.id) as total_workouts,
-        COUNT(DISTINCT e.id) as total_exercises,
         COUNT(s.id) as total_sets,
         SUM(s.weight * s.reps) as total_volume,
-        AVG(s.duration_cleaned) as avg_rest_time
+        COUNT(DISTINCT e.id) as active_exercises
     FROM sets s
     JOIN workouts w ON s.workout_id = w.id
     JOIN exercises e ON s.exercise_id = e.id
+    WHERE w.date >= ?
 `);
 
-const getExerciseStatsStmt = db.prepare(`
+const getWeeklyStatsStmt = db.prepare(`
     SELECT 
-        e.id,
-        e.name,
+        strftime('%Y-%W', w.date) as week,
+        MIN(w.date) as week_start,
         COUNT(DISTINCT w.id) as workout_count,
-        COUNT(s.id) as total_sets,
-        MAX(s.weight) as max_weight,
-        MAX(s.reps) as max_reps,
-        AVG(s.weight) as avg_weight,
-        SUM(s.weight * s.reps) as total_volume
-    FROM exercises e
-    LEFT JOIN sets s ON s.exercise_id = e.id
-    LEFT JOIN workouts w ON s.workout_id = w.id
-    GROUP BY e.id
-    ORDER BY workout_count DESC, e.name
+        SUM(s.weight * s.reps) as volume
+    FROM sets s
+    JOIN workouts w ON s.workout_id = w.id
+    WHERE w.date >= ?
+    GROUP BY week
+    ORDER BY week
+`);
+
+const getExerciseVolumeStatsStmt = db.prepare(`
+    SELECT 
+        e.name,
+        COUNT(s.id) as set_count,
+        SUM(s.weight * s.reps) as volume
+    FROM sets s
+    JOIN workouts w ON s.workout_id = w.id
+    JOIN exercises e ON s.exercise_id = e.id
+    WHERE w.date >= ?
+    GROUP BY e.id, e.name
+    ORDER BY volume DESC
 `);
 
 // Dauer-Berechnung und Ausreißer-Bereinigung
@@ -405,9 +414,20 @@ module.exports = {
     calculateAndCleanDurations,
     
     // Statistiken
-    getWeightProgressionForExercise: (exerciseId) => getWeightProgressionForExerciseStmt.all(exerciseId),
-    getOverallStats: () => getOverallStatsStmt.get(),
-    getExerciseStats: () => getExerciseStatsStmt.all(),
+    getWeightProgressionForExercise: (exerciseId, startDate) => {
+        const start = startDate || '1970-01-01';
+        return getWeightProgressionForExerciseStmt.all(exerciseId, start);
+    },
+    
+    getStats: (startDate) => {
+        const start = startDate || '1970-01-01';
+        
+        return {
+            totals: getDetailedStatsStmt.get(start),
+            weekly: getWeeklyStatsStmt.all(start),
+            exercises: getExerciseVolumeStatsStmt.all(start)
+        };
+    },
     
     // Utility
     close: () => db.close()

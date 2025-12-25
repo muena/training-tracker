@@ -80,18 +80,19 @@ async function handleApi(req, res, endpoint) {
                     return jsonResponse(res, 200, { sets: db.getAllSetsWithDetails() });
                 
                 case 'stats':
-                    return jsonResponse(res, 200, { 
-                        overall: db.getOverallStats(),
-                        exercises: db.getExerciseStats()
-                    });
+                    const startDate = new URL(req.url, 'http://localhost').searchParams.get('start');
+                    return jsonResponse(res, 200, db.getStats(startDate));
                 
                 case 'stats/exercise': {
-                    const exerciseId = parseInt(new URL(req.url, 'http://localhost').searchParams.get('id'));
+                    const url = new URL(req.url, 'http://localhost');
+                    const exerciseId = parseInt(url.searchParams.get('id'));
+                    const start = url.searchParams.get('start');
+                    
                     if (!exerciseId) {
                         return jsonResponse(res, 400, { error: 'Exercise ID required' });
                     }
                     return jsonResponse(res, 200, { 
-                        progression: db.getWeightProgressionForExercise(exerciseId)
+                        progression: db.getWeightProgressionForExercise(exerciseId, start)
                     });
                 }
                 

@@ -11,7 +11,9 @@ const state = {
     sets: [],               // Alle Sätze
     workouts: [],           // Letzte Workouts
     currentExercise: null,  // Aktuell ausgewählte Übung für Modal
-    loading: true
+    loading: true,
+    statsPeriod: '1m',      // Standard: 1 Monat
+    statsData: null         // Statistik-Daten vom Server
 };
 
 // ============================================
@@ -182,10 +184,23 @@ async function loadData() {
     }
 }
 
+function getStatsStartDate(period) {
+    const d = new Date();
+    switch (period) {
+        case '1m': d.setMonth(d.getMonth() - 1); break;
+        case '3m': d.setMonth(d.getMonth() - 3); break;
+        case '6m': d.setMonth(d.getMonth() - 6); break;
+        case '1y': d.setFullYear(d.getFullYear() - 1); break;
+        case 'all': return '1970-01-01';
+    }
+    return d.toISOString().split('T')[0];
+}
+
 async function loadStats() {
     try {
-        const stats = await api('stats');
-        renderStats(stats);
+        const start = getStatsStartDate(state.statsPeriod);
+        state.statsData = await api(`stats?start=${start}`);
+        renderStats();
     } catch (error) {
         console.error('Error loading stats:', error);
     }
@@ -410,60 +425,141 @@ function renderExercisesView() {
     }
 }
 
+function switchStatsPeriod(period) {
+    state.statsPeriod = period;
+    loadStats();
+    
+    // Falls eine Übung im Chart ausgewählt ist, diese auch aktualisieren
+    const select = document.getElementById('chartExerciseSelect');
+    if (select && select.value) {
+        loadExerciseChart(select.value);
+    }
+}
+
+// Chart-Instanzen global speichern
+let weeklyChart = null;
+let splitChart = null;
 let progressChart = null;
 
-function renderStats(stats) {
-    const { overall, exercises } = stats;
+function renderStats() {
+    const data = state.statsData;
+    if (!data) return;
+
+    const { totals, weekly, exercises } = data;
     
-    elements.overallStats.innerHTML = `
-        <h3>Gesamtstatistik</h3>
+    // 1. Period Selector
+    const periods = [
+        { id: '1m', label: '1 M' },
+        { id: '3m', label: '3 M' },
+        { id: '6m', label: '6 M' },
+        { id: '1y', label: '1 J' },
+        { id: 'all', label: 'Max' }
+    ];
+
+    const periodHtml = `
+        <div class="stats-filter">
+            ${periods.map(p => `
+                <button class="filter-btn ${state.statsPeriod === p.id ? 'active' : ''}" 
+                        onclick="switchStatsPeriod('${p.id}')">
+                    ${p.label}
+                </button>
+            `).join('')}
+        </div>
+    `;
+
+    // 2. KPIs
+    const kpiHtml = `
         <div class="stats-grid">
             <div class="stat-item">
-                <div class="stat-value">${overall?.total_workouts || 0}</div>
+                <div class="stat-value">${totals?.total_workouts || 0}</div>
                 <div class="stat-label">Workouts</div>
             </div>
             <div class="stat-item">
-                <div class="stat-value">${overall?.total_exercises || 0}</div>
-                <div class="stat-label">Übungen</div>
+                <div class="stat-value">${Math.round((totals?.total_volume || 0) / 1000)}t</div>
+                <div class="stat-label">Volumen</div>
             </div>
             <div class="stat-item">
-                <div class="stat-value">${overall?.total_sets || 0}</div>
+                <div class="stat-value">${totals?.total_sets || 0}</div>
                 <div class="stat-label">Sätze</div>
             </div>
             <div class="stat-item">
-                <div class="stat-value">${Math.round((overall?.total_volume || 0) / 1000)}t</div>
-                <div class="stat-label">Gesamtvolumen</div>
+                <div class="stat-value">${totals?.active_exercises || 0}</div>
+                <div class="stat-label">Übungen</div>
             </div>
         </div>
     `;
-    
-    // Populate exercise selector for chart
-    const chartSelect = document.getElementById('chartExerciseSelect');
-    if (chartSelect && state.exercises.length > 0) {
-        chartSelect.innerHTML = `
-            <option value="">Übung wählen...</option>
-            ${state.exercises.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
-        `;
-    }
-    
-    // Top Übungen
-    if (exercises && exercises.length > 0) {
-        const topExercises = exercises.slice(0, 5);
-        elements.exerciseStatsContainer.innerHTML = `
-            <div class="stats-card">
-                <h3>Top Übungen</h3>
+
+    // 3. Weekly Chart Container
+    const weeklyChartHtml = `
+        <div class="stats-card">
+            <h3>Verlauf (Wöchentlich)</h3>
+            <div class="chart-wrapper" style="height: 250px;">
+                <canvas id="weeklyChart"></canvas>
+            </div>
+        </div>
+    `;
+
+    // 4. Progress Chart Container (Wiederhergestellt)
+    // Sortiere Übungen alphabetisch
+    const sortedExercises = [...state.exercises].sort((a, b) => a.name.localeCompare(b.name));
+
+    const progressChartHtml = `
+        <div class="stats-card">
+            <h3>Gewichtsverlauf (Übung)</h3>
+            <select id="chartExerciseSelect" class="exercise-select" onchange="loadExerciseChart(this.value)">
+                <option value="">Übung wählen...</option>
+                ${sortedExercises.map(e => `<option value="${e.id}">${e.name.replace(/"/g, '&quot;')}</option>`).join('')}
+            </select>
+            <div class="chart-wrapper" style="height: 250px;">
+                <canvas id="progressChart"></canvas>
+            </div>
+        </div>
+    `;
+
+    // 5. Split Chart Container
+    const splitChartHtml = `
+        <div class="stats-card">
+            <h3>Muskelgruppen (Volumen)</h3>
+            <div class="chart-wrapper" style="height: 250px; display: flex; justify-content: center;">
+                <canvas id="splitChart"></canvas>
+            </div>
+        </div>
+    `;
+
+    // 6. Top Exercises List
+    const topExercises = exercises.slice(0, 5);
+    const topExercisesHtml = `
+        <div class="stats-card">
+            <h3>Top Übungen (Volumen)</h3>
+            <div class="all-exercises-list">
                 ${topExercises.map(e => `
                     <div class="all-exercise-item" style="cursor: default;">
-                        <span class="exercise-item-name">${e.name}</span>
+                        <span class="exercise-item-name">${getExerciseIcon(e.name)} ${e.name}</span>
                         <span class="exercise-item-stats">
-                            Max: ${e.max_weight || 0}kg • ${e.total_sets || 0} Sätze
+                            ${Math.round(e.volume / 1000)}t (${e.set_count} Sets)
                         </span>
                     </div>
                 `).join('')}
             </div>
-        `;
-    }
+        </div>
+    `;
+
+    elements.overallStats.innerHTML = periodHtml + kpiHtml;
+    // Clear old containers
+    elements.chartContainer.innerHTML = ''; 
+    elements.exerciseStatsContainer.innerHTML = weeklyChartHtml + progressChartHtml + splitChartHtml + topExercisesHtml;
+
+    // Charts rendern
+    renderWeeklyChart(weekly);
+    renderSplitChart(exercises);
+    // Progress Chart wird erst gerendert, wenn eine Übung ausgewählt wird
 }
+
+// ... WeeklyChart ...
+
+// ... MuscleGroup ...
+
+// ... SplitChart ...
 
 async function loadExerciseChart(exerciseId) {
     if (!exerciseId) {
@@ -491,6 +587,234 @@ function renderProgressChart(progression) {
     }
     
     if (!progression || progression.length === 0) {
+        return;
+    }
+    
+    const labels = progression.map(p => {
+        const date = new Date(p.workout_date);
+        return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+    });
+    
+    const weights = progression.map(p => p.max_weight);
+    const volumes = progression.map(p => Math.round(p.total_volume));
+    
+    progressChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Max. Gewicht (kg)',
+                    data: weights,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.3,
+                    fill: true,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Volumen (kg)',
+                    data: volumes,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.3,
+                    fill: true,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#94a3b8',
+                        font: { size: 12 }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#64748b' },
+                    grid: { color: 'rgba(51, 65, 85, 0.5)' }
+                },
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    ticks: { color: '#3b82f6' },
+                    grid: { color: 'rgba(51, 65, 85, 0.5)' },
+                    title: {
+                        display: true,
+                        text: 'Gewicht (kg)',
+                        color: '#3b82f6'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    ticks: { color: '#10b981' },
+                    grid: { drawOnChartArea: false },
+                    title: {
+                        display: true,
+                        text: 'Volumen (kg)',
+                        color: '#10b981'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderWeeklyChart(weeklyData) {
+    const ctx = document.getElementById('weeklyChart');
+    if (!ctx) return;
+
+    if (weeklyChart) weeklyChart.destroy();
+
+    const labels = weeklyData.map(d => {
+        // week_start formatieren (YYYY-MM-DD -> DD.MM)
+        const date = new Date(d.week_start);
+        return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+    });
+
+    weeklyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Workouts',
+                    data: weeklyData.map(d => d.workout_count),
+                    backgroundColor: '#3b82f6',
+                    yAxisID: 'y',
+                    order: 2
+                },
+                {
+                    label: 'Volumen (t)',
+                    data: weeklyData.map(d => d.volume / 1000),
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    type: 'line',
+                    tension: 0.3,
+                    fill: true,
+                    yAxisID: 'y1',
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                x: { ticks: { color: '#64748b' }, grid: { display: false } },
+                y: { 
+                    type: 'linear', position: 'left', 
+                    ticks: { color: '#3b82f6', stepSize: 1 }, 
+                    grid: { color: 'rgba(51, 65, 85, 0.3)' }
+                },
+                y1: { 
+                    type: 'linear', position: 'right', 
+                    ticks: { color: '#10b981' }, 
+                    grid: { display: false }
+                }
+            },
+            plugins: { legend: { display: false } } // Platz sparen
+        }
+    });
+}
+
+function getMuscleGroup(exerciseName) {
+    const name = exerciseName.toLowerCase();
+    if (name.includes('bank') || name.includes('brust') || name.includes('flieg') || name.includes('butterfly') || name.includes('dip')) return 'Brust';
+    if (name.includes('rücken') || name.includes('lat') || name.includes('ruder') || name.includes('pull') || name.includes('deadlift')) return 'Rücken';
+    if (name.includes('schulter') || name.includes('shoulder') || name.includes('seitheben') || name.includes('front') || name.includes('press')) return 'Schultern';
+    if (name.includes('bizeps') || name.includes('curl')) return 'Bizeps';
+    if (name.includes('trizeps') || name.includes('tricep') || name.includes('drücken')) return 'Trizeps'; // Kabeldrücken etc.
+    if (name.includes('bein') || name.includes('squat') || name.includes('lunge') || name.includes('wade') || name.includes('streck') || name.includes('beug')) return 'Beine';
+    if (name.includes('bauch') || name.includes('crunch') || name.includes('plank')) return 'Bauch';
+    return 'Sonstige';
+}
+
+function renderSplitChart(exercises) {
+    const ctx = document.getElementById('splitChart');
+    if (!ctx) return;
+
+    if (splitChart) splitChart.destroy();
+
+    // Aggregieren nach Muskelgruppe
+    const groups = {};
+    exercises.forEach(e => {
+        const group = getMuscleGroup(e.name);
+        if (!groups[group]) groups[group] = 0;
+        groups[group] += e.volume;
+    });
+
+    const labels = Object.keys(groups);
+    const data = Object.values(groups);
+    
+    // Farben für Gruppen
+    const colors = [
+        '#3b82f6', '#10b981', '#f59e0b', '#ef4444', 
+        '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'
+    ];
+
+    splitChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data,
+                backgroundColor: colors,
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'right', labels: { color: '#94a3b8' } }
+            }
+        }
+    });
+}
+
+async function loadExerciseChart(exerciseId) {
+    // Falls keine ID übergeben wurde (z.B. durch leere Auswahl), Chart löschen
+    if (!exerciseId) {
+        if (progressChart) {
+            progressChart.destroy();
+            progressChart = null;
+        }
+        return;
+    }
+    
+    try {
+        const start = getStatsStartDate(state.statsPeriod);
+        const data = await api(`stats/exercise?id=${exerciseId}&start=${start}`);
+        renderProgressChart(data.progression);
+    } catch (error) {
+        console.error('Error loading chart:', error);
+    }
+}
+
+function renderProgressChart(progression) {
+    const ctx = document.getElementById('progressChart');
+    if (!ctx) return;
+    
+    if (progressChart) {
+        progressChart.destroy();
+    }
+    
+    if (!progression || progression.length === 0) {
+        // Optional: Leeren Chart anzeigen oder Nachricht
         return;
     }
     
