@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  training-tracker:
+    build: .
+    container_name: training-tracker
+    ports:
+      - "8765:8765"
+    environment:
+      - PORT=8765
+      - NODE_ENV=production
+      - AUTH_ENABLED=${AUTH_ENABLED:-true}
+      - AUTH_USERNAME=${AUTH_USERNAME:-admin}
+      - AUTH_PASSWORD=${AUTH_PASSWORD}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8765/', (r) => {process.exit(r.statusCode === 200 || r.statusCode === 401 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s

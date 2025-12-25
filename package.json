@@ -1,0 +1,22 @@
+{
+  "name": "training-tracker",
+  "version": "2.0.0",
+  "description": "Mobile-first strength training tracker with SQLite",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "migrate": "node migrate.js"
+  },
+  "keywords": [
+    "training",
+    "tracker",
+    "fitness",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "better-sqlite3": "^12.5.0"
+  }
+}

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Training Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <!-- App Container -->
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>Training Tracker</h1>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab active" data-view="workout">Workout</button>
+            <button class="tab" data-view="exercises">Übungen</button>
+            <button class="tab" data-view="stats">Statistik</button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Loading State -->
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Lade Daten...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="error" class="error" style="display: none;"></div>
+
+            <!-- Workout View -->
+            <section id="workoutView" class="view active">
+                <!-- Current Workout Header -->
+                <div class="workout-header">
+                    <div class="workout-date" id="dateSelector" style="cursor: pointer;">
+                        <span id="currentDate">Heute</span>
+                        <span style="color: var(--text-muted); font-size: 12px;">antippen zum Ändern</span>
+                    </div>
+                </div>
+
+                <!-- Exercise List (Overview with last weights) -->
+                <div id="exerciseList" class="exercise-list">
+                    <!-- Dynamically filled -->
+                </div>
+
+                <!-- Add Exercise Button -->
+                <button id="addExerciseBtn" class="add-exercise-btn">
+                    + Übung hinzufügen
+                </button>
+            </section>
+
+            <!-- Exercises View (All exercises) -->
+            <section id="exercisesView" class="view">
+                <div class="search-bar">
+                    <input type="text" id="exerciseSearch" placeholder="Übung suchen...">
+                </div>
+                <div id="allExercisesList" class="all-exercises-list">
+                    <!-- Dynamically filled -->
+                </div>
+                <button id="createExerciseBtn" class="primary-btn">
+                    + Neue Übung erstellen
+                </button>
+            </section>
+
+            <!-- Stats View -->
+            <section id="statsView" class="view">
+                <div id="overallStats" class="stats-card">
+                    <!-- Overall stats -->
+                </div>
+                
+                <!-- Exercise selector for chart -->
+                <div class="stats-card">
+                    <h3>Gewichtsverlauf</h3>
+                    <select id="chartExerciseSelect" class="exercise-select">
+                        <option value="">Übung wählen...</option>
+                    </select>
+                    <div id="chartContainer" class="chart-wrapper">
+                        <canvas id="progressChart"></canvas>
+                    </div>
+                </div>
+                
+                <div id="exerciseStatsContainer">
+                    <!-- Exercise-specific stats -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal Container -->
+    <div id="modalContainer"></div>
+
+    <!-- Exercise Detail Modal (for adding sets) -->
+    <div id="exerciseModal" class="modal" style="display: none;">
+        <div class="modal-content exercise-detail">
+            <div class="modal-header">
+                <h2 id="exerciseModalTitle">Übung</h2>
+                <button class="close-modal">×</button>
+            </div>
+            <div class="modal-body">
+                <!-- Last workout info -->
+                <div id="lastWorkoutInfo" class="last-workout-info">
+                    <span class="label">Letztes Training:</span>
+                    <span id="lastWorkoutDate">-</span>
+                </div>
+
+                <!-- Sets list -->
+                <div id="setsContainer" class="sets-container">
+                    <!-- Existing sets for today -->
+                </div>
+
+                <!-- Quick add set -->
+                <div class="quick-add-set">
+                    <h3>Neuer Satz</h3>
+                    <div class="set-inputs">
+                        <div class="input-group">
+                            <label>Gewicht (kg)</label>
+                            <div class="number-input">
+                                <button class="decrement" data-field="weight">-</button>
+                                <input type="number" id="newWeight" step="1" min="0" value="0">
+                                <button class="increment" data-field="weight">+</button>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Wiederholungen</label>
+                            <div class="number-input">
+                                <button class="decrement" data-field="reps">-</button>
+                                <input type="number" id="newReps" min="0" value="0">
+                                <button class="increment" data-field="reps">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="difficulty-selector">
+                        <label>Anstrengung:</label>
+                        <div class="difficulty-options">
+                            <button class="diff-btn" data-value="Leicht" title="Leicht">🟢</button>
+                            <button class="diff-btn active" data-value="Mittel" title="Mittel">🟡</button>
+                            <button class="diff-btn" data-value="Schwer" title="Schwer">🟠</button>
+                            <button class="diff-btn" data-value="Sehr schwer" title="Sehr schwer">🔴</button>
+                        </div>
+                    </div>
+                    <button id="addSetBtn" class="primary-btn full-width">
+                        Satz hinzufügen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
