@@ -679,7 +679,13 @@ function renderWeeklyChart(weeklyData) {
     if (weeklyChart) weeklyChart.destroy();
 
     const labels = weeklyData.map(d => {
-        // week_start formatieren (YYYY-MM-DD -> DD.MM)
+        // Format: "KW XX"
+        // d.week kommt als "YYYY-WW" aus der Datenbank
+        if (d.week) {
+            const [year, week] = d.week.split('-');
+            return `KW ${week}`;
+        }
+        // Fallback
         const date = new Date(d.week_start);
         return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
     });
