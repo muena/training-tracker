@@ -151,6 +151,29 @@ const deleteSetStmt = db.prepare(`
     DELETE FROM sets WHERE id = ?
 `);
 
+const getSetMetaByIdStmt = db.prepare(`
+    SELECT id, workout_id, exercise_id, set_number
+    FROM sets
+    WHERE id = ?
+`);
+
+const getSetIdsForWorkoutExerciseStmt = db.prepare(`
+    SELECT id, set_number
+    FROM sets
+    WHERE workout_id = ? AND exercise_id = ?
+    ORDER BY set_number
+`);
+
+const bumpSetNumbersForWorkoutExerciseStmt = db.prepare(`
+    UPDATE sets
+    SET set_number = set_number + ?
+    WHERE workout_id = ? AND exercise_id = ?
+`);
+
+const updateSetNumberByIdStmt = db.prepare(`
+    UPDATE sets SET set_number = ? WHERE id = ?
+`);
+
 const deleteExerciseStmt = db.prepare(`
     DELETE FROM exercises WHERE id = ?
 `);
@@ -283,6 +306,30 @@ function cleanDurationOutliers(workout_id) {
     }
 }
 
+const RENUMBER_SET_OFFSET = 1000000;
+
+function renumberSetsForWorkoutExercise(workoutId, exerciseId) {
+    // Avoid unique constraint collisions by bumping first
+    bumpSetNumbersForWorkoutExerciseStmt.run(RENUMBER_SET_OFFSET, workoutId, exerciseId);
+
+    const rows = getSetIdsForWorkoutExerciseStmt.all(workoutId, exerciseId);
+    rows.forEach((row, index) => {
+        updateSetNumberByIdStmt.run(index + 1, row.id);
+    });
+
+    return { count: rows.length };
+}
+
+const deleteSetWithRenumberTx = db.transaction((setId) => {
+    const meta = getSetMetaByIdStmt.get(setId);
+    if (!meta) return { deleted: false, renumbered: 0 };
+
+    deleteSetStmt.run(setId);
+
+    const renumber = renumberSetsForWorkoutExercise(meta.workout_id, meta.exercise_id);
+    return { deleted: true, renumbered: renumber.count };
+});
+
 module.exports = {
     db,
     
@@ -345,7 +392,7 @@ module.exports = {
         }
     },
     updateSet: (id, weight, reps, difficulty) => updateSetStmt.run(weight, reps, difficulty, id),
-    deleteSet: (id) => deleteSetStmt.run(id),
+    deleteSet: (id) => deleteSetWithRenumberTx(id),
     deleteExercise: (id) => {
         // Erst alle Sätze der Übung löschen
         db.prepare(`DELETE FROM sets WHERE exercise_id = ?`).run(id);

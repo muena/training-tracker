@@ -160,16 +160,21 @@ async function handleApi(req, res, endpoint) {
                         reps || 0,
                         difficulty || 'Mittel'
                     );
+
+                    const createdAt = db.db
+                        .prepare('SELECT created_at FROM sets WHERE id = ?')
+                        .get(result.id)?.created_at;
                     
                     return jsonResponse(res, 201, {
                         id: result.id,
                         workout_id: workout.id,
                         exercise_id: exercise.id,
                         exercise_name: exercise.name,
-                        set_number: setNumber,
+                        set_number: setNumber || 1,
                         weight,
                         reps,
-                        difficulty
+                        difficulty,
+                        created_at: createdAt
                     });
                 }
                 
@@ -213,8 +218,8 @@ async function handleApi(req, res, endpoint) {
                 if (!id) {
                     return jsonResponse(res, 400, { error: 'Set ID required' });
                 }
-                db.deleteSet(id);
-                return jsonResponse(res, 200, { success: true });
+                const result = db.deleteSet(id);
+                return jsonResponse(res, 200, { success: true, ...result });
             }
             
             if (endpoint.startsWith('exercises/')) {

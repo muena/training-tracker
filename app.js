@@ -63,6 +63,16 @@ function formatDateFull(dateString) {
     });
 }
 
+function formatDateFullCompact(dateString) {
+    // Compact for tight UI (e.g. swipe cards)
+    return new Date(dateString).toLocaleDateString('de-DE', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    });
+}
+
 function getDifficultyEmoji(difficulty) {
     const map = {
         'Leicht': '🟢',
@@ -569,27 +579,28 @@ function renderProgressChart(progression) {
 // ============================================
 // Modal Functions
 // ============================================
-function getLastWorkoutSets(exerciseId, excludeDate = null) {
-    // Alle Sätze dieser Übung, außer dem ausgeschlossenen Datum
+function getWorkoutHistoryForExercise(exerciseId, beforeDate, limit = 5) {
+    // "Vergangene Trainings" = Workouts vor dem aktuell ausgewählten Datum
+    const cutoffDate = beforeDate || '9999-12-31';
     const exerciseSets = state.sets
-        .filter(s => s.exercise_id === exerciseId && s.workout_date !== excludeDate)
-        .sort((a, b) => {
-            const dateCompare = new Date(b.workout_date) - new Date(a.workout_date);
-            if (dateCompare !== 0) return dateCompare;
-            return a.set_number - b.set_number;
-        });
-    
-    if (exerciseSets.length === 0) return { date: null, sets: [] };
-    
-    // Das letzte Workout-Datum finden
-    const lastWorkoutDate = exerciseSets[0].workout_date;
-    
-    // Alle Sätze dieses Datums zurückgeben
-    const lastWorkoutSets = exerciseSets
-        .filter(s => s.workout_date === lastWorkoutDate)
-        .sort((a, b) => a.set_number - b.set_number);
-    
-    return { date: lastWorkoutDate, sets: lastWorkoutSets };
+        .filter(s => s.exercise_id === exerciseId && s.workout_date < cutoffDate);
+
+    if (exerciseSets.length === 0) return [];
+
+    // Gruppiere nach Workout-Datum
+    const byDate = new Map();
+    exerciseSets.forEach(set => {
+        if (!byDate.has(set.workout_date)) byDate.set(set.workout_date, []);
+        byDate.get(set.workout_date).push(set);
+    });
+
+    // Neueste zuerst
+    const dates = [...byDate.keys()].sort().reverse().slice(0, limit);
+
+    return dates.map(date => ({
+        date,
+        sets: byDate.get(date).slice().sort((a, b) => a.set_number - b.set_number)
+    }));
 }
 
 function openExerciseModal(exerciseId) {
@@ -603,10 +614,12 @@ function openExerciseModal(exerciseId) {
         .filter(s => s.exercise_id === exerciseId && s.workout_date === state.currentDate)
         .sort((a, b) => a.set_number - b.set_number);
     
-    // Alle Sätze des letzten Trainings holen
-    const lastWorkout = getLastWorkoutSets(exerciseId, state.currentDate);
-    const lastWorkoutDate = lastWorkout.date;
-    const lastWorkoutSets = lastWorkout.sets;
+    // Verlauf: letzte 5 vergangene Trainings (vor aktuellem Datum)
+    const workoutHistory = getWorkoutHistoryForExercise(exerciseId, state.currentDate, 5);
+    const lastWorkoutEntry = workoutHistory[0] || null;
+    const lastWorkoutDate = lastWorkoutEntry?.date || null;
+    const lastWorkoutSets = lastWorkoutEntry?.sets || [];
+    const olderWorkouts = workoutHistory.slice(1);
     
     // Next set number
     const nextSetNumber = currentSets.length > 0 
@@ -633,21 +646,30 @@ function openExerciseModal(exerciseId) {
         btn.classList.toggle('active', btn.dataset.value === (suggestedSet?.difficulty || 'Mittel'));
     });
     
-    // Render last workout sets (Referenz)
+    // Render history as horizontal swipe cards (Referenz)
     const lastSetsContainer = document.getElementById('lastSetsContainer') || createLastSetsContainer();
-    if (lastWorkoutSets.length > 0) {
+    if (workoutHistory.length > 0) {
+        const historyCount = workoutHistory.length;
+
         lastSetsContainer.innerHTML = `
-            <h3>Letztes Training (${formatDate(lastWorkoutDate)})</h3>
-            <div class="last-sets-list">
-                ${lastWorkoutSets.map(set => `
-                    <div class="last-set-row ${set.set_number === nextSetNumber ? 'highlighted' : ''}">
-                        <span class="set-number">${set.set_number}</span>
-                        <span class="set-weight">${set.weight} kg</span>
-                        <span class="set-reps">${set.reps} Wdh.</span>
-                        <span class="set-difficulty">${getDifficultyEmoji(set.difficulty)}</span>
+            <h3>Vergangene Trainings (letzte ${historyCount})</h3>
+            <div class="history-carousel" aria-label="Vergangene Trainings">
+                ${workoutHistory.map(workout => `
+                    <div class="history-card">
+                        <div class="history-card-header">${formatDateFullCompact(workout.date)}</div>
+                        <div class="last-sets-list">
+                            ${workout.sets.map(set => `
+                                <div class="last-set-row ${set.set_number === nextSetNumber ? 'highlighted' : ''}">
+                                    <span class="set-number">${set.set_number}</span>
+                                    <span class="set-metric"><span class="weight">${set.weight}kg</span><span class="reps">×${set.reps}</span></span>
+                                    <span class="set-difficulty">${getDifficultyEmoji(set.difficulty)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
                 `).join('')}
             </div>
+            ${historyCount > 1 ? `<div class="history-swipe-hint">Wischen für ältere Trainings</div>` : ''}
         `;
         lastSetsContainer.style.display = 'block';
     } else {
@@ -926,7 +948,8 @@ async function addSet() {
             set_number: setNumber,
             weight,
             reps,
-            difficulty
+            difficulty,
+            created_at: result.created_at || new Date().toISOString()
         });
         
         showToast(`Satz ${setNumber} gespeichert`);
@@ -1033,15 +1056,28 @@ async function saveSetEdit(setId) {
 
 async function deleteSet(setId) {
     if (!confirm('Satz wirklich löschen?')) return;
-    
+
+    const deletedSet = state.sets.find(s => s.id === setId);
+
     try {
         await api(`sets/${setId}`, { method: 'DELETE' });
-        
+
         // Aus lokalem State entfernen
         state.sets = state.sets.filter(s => s.id !== setId);
-        
+
+        // Lokal renumbern, damit UI sofort stimmt
+        if (deletedSet) {
+            const affected = state.sets
+                .filter(s => s.exercise_id === deletedSet.exercise_id && s.workout_id === deletedSet.workout_id)
+                .sort((a, b) => a.set_number - b.set_number);
+
+            affected.forEach((set, index) => {
+                set.set_number = index + 1;
+            });
+        }
+
         showToast('Satz gelöscht');
-        
+
         // Views aktualisieren
         if (state.currentExercise) {
             openExerciseModal(state.currentExercise.id);
