@@ -380,6 +380,9 @@ const server = http.createServer(async (req, res) => {
         const redirectUri = GOOGLE_REDIRECT_URI_ENV || `${protocol}://${host}/auth/google/callback`;
 
         try {
+            console.log('Auth Callback received. Protocol:', req.headers['x-forwarded-proto'], 'Host:', req.headers['x-forwarded-host']);
+            console.log('Using Redirect URI:', redirectUri);
+
             // 1. Exchange code for token
             const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
@@ -394,7 +397,10 @@ const server = http.createServer(async (req, res) => {
             });
             const tokenData = await tokenRes.json();
             
-            if (!tokenData.access_token) throw new Error('Token exchange failed');
+            if (!tokenData.access_token) {
+                console.error('Token Exchange failed:', JSON.stringify(tokenData));
+                throw new Error('Token exchange failed: ' + (tokenData.error_description || tokenData.error));
+            }
 
             // 2. Get User Profile
             const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
