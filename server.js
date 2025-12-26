@@ -197,6 +197,21 @@ async function handleApi(req, res, endpoint) {
         if (req.method === 'PUT' || req.method === 'PATCH') {
             const body = await parseBody(req);
             
+            if (endpoint.startsWith('exercises/')) {
+                const id = parseInt(endpoint.split('/')[1]);
+                const { name, icon } = body;
+                
+                if (!id) {
+                    return jsonResponse(res, 400, { error: 'Exercise ID required' });
+                }
+                if (!name) {
+                    return jsonResponse(res, 400, { error: 'Name ist erforderlich' });
+                }
+                
+                const updated = db.updateExercise(id, name, icon);
+                return jsonResponse(res, 200, updated);
+            }
+            
             if (endpoint.startsWith('sets/')) {
                 const id = parseInt(endpoint.split('/')[1]);
                 const { weight, reps, difficulty } = body;

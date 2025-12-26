@@ -89,7 +89,8 @@ function getDifficultyEmoji(difficulty) {
     return map[difficulty] || '🟡';
 }
 
-function getExerciseIcon(exerciseName) {
+// Automatische Icon-Erkennung basierend auf dem Namen
+function getExerciseIconAuto(exerciseName) {
     const name = exerciseName.toLowerCase();
     
     // Brust
@@ -130,6 +131,27 @@ function getExerciseIcon(exerciseName) {
     // Standard
     return '🏋️';
 }
+
+// Holt das Icon für eine Übung (gespeichertes Icon bevorzugt)
+function getExerciseIcon(exerciseNameOrObj, icon = null) {
+    // Falls ein Objekt übergeben wurde
+    if (typeof exerciseNameOrObj === 'object' && exerciseNameOrObj !== null) {
+        if (exerciseNameOrObj.icon) return exerciseNameOrObj.icon;
+        return getExerciseIconAuto(exerciseNameOrObj.name || '');
+    }
+    // Falls ein gespeichertes Icon übergeben wurde
+    if (icon) return icon;
+    // Fallback: Auto-Erkennung
+    return getExerciseIconAuto(exerciseNameOrObj);
+}
+
+// Liste aller verfügbaren Icons für die Auswahl
+const AVAILABLE_ICONS = [
+    '🏋️', '💪', '🦵', '🦶', '🏃', '🚴', '🏊', '🧘',
+    '🦋', '🚣', '🔽', '⬆️', '⬇️', '↔️', '🔱', '✊',
+    '🎯', '📏', '🏗️', '🔙', '🎭', '🦿', '🚶', '⭐',
+    '🔥', '💥', '⚡', '🎖️', '🏆', '💎', '🛡️', '⚔️'
+];
 
 function showToast(message, type = 'success') {
     const existing = document.querySelector('.toast');
@@ -297,6 +319,7 @@ function renderWorkoutView() {
         return {
             id: e.id,
             name: e.name,
+            icon: e.icon,
             sets: sets,
             hasCurrentSets: exercisesWithSets.has(e.id),
             firstSetTime: firstSetTime,
@@ -352,7 +375,7 @@ function renderWorkoutView() {
         return `
             <div class="exercise-card ${hasSetsToday ? '' : 'no-sets'}" onclick="openExerciseModal(${exercise.id})">
                 <div class="exercise-card-header">
-                    <span class="exercise-name">${getExerciseIcon(exercise.name)} ${exercise.name}</span>
+                    <span class="exercise-name">${getExerciseIcon(exercise)} ${exercise.name}</span>
                     ${hasSetsToday ? `<span class="exercise-badge">${currentSetsCount} Sätze</span>` : ''}
                 </div>
                 ${hasSetsToday ? `
@@ -400,9 +423,9 @@ function renderExercisesView() {
     exercisesWithStats.sort((a, b) => b.setCount - a.setCount);
     
     elements.allExercisesList.innerHTML = exercisesWithStats.map(e => `
-        <div class="all-exercise-item">
-            <div onclick="openExerciseModal(${e.id})" style="flex: 1;">
-                <span class="exercise-item-name">${e.name}</span>
+        <div class="all-exercise-item" onclick="showEditExerciseModal(${e.id})">
+            <div style="flex: 1;">
+                <span class="exercise-item-name">${getExerciseIcon(e)} ${e.name}</span>
                 <div class="exercise-item-stats">
                     ${e.setCount} Sätze${e.lastSet ? ` • ${e.lastSet.weight}kg` : ''}
                 </div>
@@ -1224,6 +1247,100 @@ function createExerciseFromSearch() {
             const input = document.getElementById('newExerciseName');
             if (input) input.value = name;
         }, 100);
+    }
+}
+
+// Übung bearbeiten
+function showEditExerciseModal(exerciseId) {
+    const exercise = state.exercises.find(e => e.id === exerciseId);
+    if (!exercise) return;
+    
+    const currentIcon = exercise.icon || getExerciseIconAuto(exercise.name);
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'editExerciseModal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Übung bearbeiten</h2>
+                <button class="close-modal" onclick="closeModal('editExerciseModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="editExerciseName" value="${exercise.name.replace(/"/g, '&quot;')}">
+                </div>
+                
+                <div class="form-group">
+                    <label>Symbol</label>
+                    <div class="icon-selector">
+                        <div class="current-icon" id="currentExerciseIcon">${currentIcon}</div>
+                        <div class="icon-grid" id="iconGrid">
+                            ${AVAILABLE_ICONS.map(icon => `
+                                <button type="button" class="icon-option ${icon === currentIcon ? 'active' : ''}" 
+                                        data-icon="${icon}" 
+                                        onclick="selectExerciseIcon('${icon}')">
+                                    ${icon}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="primary-btn full-width" onclick="saveExerciseEdit(${exerciseId})">
+                        Speichern
+                    </button>
+                    <button class="primary-btn full-width" style="background: var(--bg-input);" onclick="openExerciseModal(${exerciseId}); closeModal('editExerciseModal');">
+                        Sätze
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('editExerciseName').focus();
+}
+
+function selectExerciseIcon(icon) {
+    // Aktuelles Icon anzeigen
+    document.getElementById('currentExerciseIcon').textContent = icon;
+    
+    // Aktiven Button aktualisieren
+    document.querySelectorAll('#iconGrid .icon-option').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.icon === icon);
+    });
+}
+
+async function saveExerciseEdit(exerciseId) {
+    const name = document.getElementById('editExerciseName').value.trim();
+    const icon = document.getElementById('currentExerciseIcon').textContent;
+    
+    if (!name) {
+        showToast('Name darf nicht leer sein', 'error');
+        return;
+    }
+    
+    try {
+        const updated = await api(`exercises/${exerciseId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ name, icon })
+        });
+        
+        // Lokalen State aktualisieren
+        const exercise = state.exercises.find(e => e.id === exerciseId);
+        if (exercise) {
+            exercise.name = updated.name;
+            exercise.icon = updated.icon;
+        }
+        
+        closeModal('editExerciseModal');
+        showToast('Übung aktualisiert');
+        renderExercisesView();
+        renderWorkoutView();
+    } catch (error) {
+        showToast(error.message, 'error');
     }
 }
 

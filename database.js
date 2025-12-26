@@ -20,9 +20,18 @@ db.exec(`
     CREATE TABLE IF NOT EXISTS exercises (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE NOT NULL,
+        icon TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
 `);
+
+// Migration: icon Spalte hinzufügen falls nicht vorhanden
+try {
+    db.exec(`ALTER TABLE exercises ADD COLUMN icon TEXT`);
+    console.log('Added icon column to exercises table');
+} catch (e) {
+    // Spalte existiert bereits - ignorieren
+}
 
 db.exec(`
     CREATE TABLE IF NOT EXISTS workouts (
@@ -66,19 +75,23 @@ console.log('Database initialized successfully');
 
 // Übungen
 const getExercisesStmt = db.prepare(`
-    SELECT id, name, created_at FROM exercises ORDER BY name
+    SELECT id, name, icon, created_at FROM exercises ORDER BY name
 `);
 
 const getExerciseByIdStmt = db.prepare(`
-    SELECT id, name, created_at FROM exercises WHERE id = ?
+    SELECT id, name, icon, created_at FROM exercises WHERE id = ?
 `);
 
 const getExerciseByNameStmt = db.prepare(`
-    SELECT id, name, created_at FROM exercises WHERE name = ?
+    SELECT id, name, icon, created_at FROM exercises WHERE name = ?
 `);
 
 const insertExerciseStmt = db.prepare(`
     INSERT INTO exercises (name) VALUES (?)
+`);
+
+const updateExerciseStmt = db.prepare(`
+    UPDATE exercises SET name = ?, icon = ? WHERE id = ?
 `);
 
 // Workouts
@@ -357,6 +370,10 @@ module.exports = {
             }
             throw err;
         }
+    },
+    updateExercise: (id, name, icon) => {
+        updateExerciseStmt.run(name, icon || null, id);
+        return getExerciseByIdStmt.get(id);
     },
     
     // Workouts

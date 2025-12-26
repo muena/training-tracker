@@ -98,6 +98,7 @@ http://localhost:8765
 **exercises**
 - `id` INTEGER PRIMARY KEY
 - `name` TEXT UNIQUE
+- `icon` TEXT (optional, emoji)
 - `created_at` DATETIME
 
 **workouts**
@@ -137,9 +138,11 @@ http://localhost:8765
 - `POST /api/sets` - Create set `{workoutDate, exerciseId, setNumber, weight, reps, difficulty}`
 
 ### PUT/PATCH Endpoints
+- `PUT /api/exercises/:id` - Update exercise `{name, icon}`
 - `PUT /api/sets/:id` - Update set `{weight, reps, difficulty}`
 
 ### DELETE Endpoints
+- `DELETE /api/exercises/:id` - Delete exercise (and all linked sets)
 - `DELETE /api/sets/:id` - Delete set
 
 ## Frontend Architecture
@@ -199,6 +202,7 @@ This handles cases where users take long breaks (conversations, phone calls) by 
 - Errors returned with `{error: "message"}`
 - Database operations use prepared statements
 - Close database connection on SIGINT/SIGTERM
+- **Use `mgrep` instead of `grep`** for semantic code search (natural language queries)
 
 ## Quick Commands
 
