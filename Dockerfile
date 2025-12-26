@@ -20,6 +20,7 @@ COPY index.html ./
 COPY app.js ./
 COPY styles.css ./
 COPY manifest.json ./
+COPY scripts ./scripts
 
 # Create data directory
 RUN mkdir -p /app/data

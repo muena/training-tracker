@@ -1,6 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 // Datenbank-Pfad (im data Ordner für Docker-Volume)
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'training.db');
@@ -201,9 +202,13 @@ const deleteSetStmt = db.prepare(`
 `);
 
 const getSetMetaByIdStmt = db.prepare(`
-    SELECT id, workout_id, exercise_id, set_number
+    SELECT id, workout_id, exercise_id, set_number, superset_id
     FROM sets
     WHERE id = ?
+`);
+
+const updateSupersetIdForAllSetsStmt = db.prepare(`
+    UPDATE sets SET superset_id = ? WHERE superset_id = ?
 `);
 
 const getSetIdsForWorkoutExerciseStmt = db.prepare(`
@@ -239,7 +244,8 @@ const getWeightProgressionForExerciseStmt = db.prepare(`
         AVG(s.weight) as avg_weight,
         AVG(s.reps) as avg_reps,
         SUM(s.weight * s.reps) as total_volume,
-        COUNT(s.id) as set_count
+        COUNT(s.id) as set_count,
+        MAX(CASE WHEN s.superset_id IS NOT NULL THEN 1 ELSE 0 END) as has_superset
     FROM sets s
     JOIN workouts w ON s.workout_id = w.id
     WHERE s.exercise_id = ? AND w.date >= ?
@@ -389,6 +395,37 @@ const deleteSetWithRenumberTx = db.transaction((setId) => {
     return { deleted: true, renumbered: renumber.count };
 });
 
+const linkSetsTx = db.transaction((setId, targetSetId) => {
+    const set = getSetMetaByIdStmt.get(setId);
+    const target = getSetMetaByIdStmt.get(targetSetId);
+
+    if (!set || !target) {
+        throw new Error('Set not found');
+    }
+
+    const setSuperset = set.superset_id || null;
+    const targetSuperset = target.superset_id || null;
+
+    // Prefer existing superset id if available
+    let supersetId = setSuperset || targetSuperset;
+
+    // If both sets already belong to different supersets, merge them
+    if (setSuperset && targetSuperset && setSuperset !== targetSuperset) {
+        supersetId = setSuperset;
+        updateSupersetIdForAllSetsStmt.run(supersetId, targetSuperset);
+    }
+
+    // If neither has a superset, create a new one
+    if (!supersetId) {
+        supersetId = crypto.randomUUID();
+    }
+
+    updateSetSupersetStmt.run(supersetId, set.id);
+    updateSetSupersetStmt.run(supersetId, target.id);
+
+    return { superset_id: supersetId };
+});
+
 module.exports = {
     db,
     
@@ -458,6 +495,7 @@ module.exports = {
     deleteSet: (id) => deleteSetWithRenumberTx(id),
     
     // Supersets
+    linkSets: (setId, targetSetId) => linkSetsTx(setId, targetSetId),
     linkSuperset: (setId, supersetId) => {
         updateSetSupersetStmt.run(supersetId, setId);
     },

@@ -162,9 +162,9 @@ async function handleApi(req, res, endpoint) {
                         difficulty || 'Mittel'
                     );
 
-                    const createdAt = db.db
-                        .prepare('SELECT created_at FROM sets WHERE id = ?')
-                        .get(result.id)?.created_at;
+                    const createdRow = db.db
+                        .prepare('SELECT created_at, superset_id FROM sets WHERE id = ?')
+                        .get(result.id);
                     
                     return jsonResponse(res, 201, {
                         id: result.id,
@@ -175,10 +175,24 @@ async function handleApi(req, res, endpoint) {
                         weight,
                         reps,
                         difficulty,
-                        created_at: createdAt
+                        superset_id: createdRow?.superset_id || null,
+                        created_at: createdRow?.created_at
                     });
                 }
                 
+                case 'sets/link': {
+                    const { setId, targetSetId } = body;
+                    const setIdNum = parseInt(setId);
+                    const targetSetIdNum = parseInt(targetSetId);
+
+                    if (!setIdNum || !targetSetIdNum) {
+                        return jsonResponse(res, 400, { error: 'setId and targetSetId required' });
+                    }
+
+                    const result = db.linkSets(setIdNum, targetSetIdNum);
+                    return jsonResponse(res, 200, { success: true, ...result, setId: setIdNum, targetSetId: targetSetIdNum });
+                }
+
                 case 'sets/complete': {
                     const { id } = body;
                     if (!id) {

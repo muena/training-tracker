@@ -605,6 +605,118 @@ function showSupersetInfo(supersetId) {
     document.body.appendChild(modal);
 }
 
+function getSupersetLinkCandidates(sourceSet) {
+    // Candidates = letzte Sätze anderer Übungen vom aktuellen Datum
+    const sameDaySets = state.sets.filter(s => s.workout_date === state.currentDate);
+
+    const candidates = sameDaySets.filter(s => s.id !== sourceSet.id && s.exercise_id !== sourceSet.exercise_id);
+
+    // Nur den jeweils neuesten Satz pro Übung anbieten (mobile-friendly)
+    const latestByExercise = new Map();
+    candidates.forEach(s => {
+        const existing = latestByExercise.get(s.exercise_id);
+        if (!existing) {
+            latestByExercise.set(s.exercise_id, s);
+            return;
+        }
+        const existingTime = new Date(existing.created_at).getTime();
+        const currentTime = new Date(s.created_at).getTime();
+        if (currentTime > existingTime) {
+            latestByExercise.set(s.exercise_id, s);
+        }
+    });
+
+    return [...latestByExercise.values()].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+function openLinkSupersetModal(setId) {
+    const sourceSet = state.sets.find(s => s.id === setId);
+    if (!sourceSet) return;
+
+    const candidates = getSupersetLinkCandidates(sourceSet);
+    if (candidates.length === 0) {
+        showToast('Keine Sätze zum Verknüpfen gefunden (heute)', 'error');
+        return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'linkSupersetModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header">
+                <h2>⛓️ Supersatz verknüpfen</h2>
+                <button class="close-modal" onclick="closeModal('linkSupersetModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 14px;">
+                    Wähle einen Satz (neuester Satz je Übung) zum Verknüpfen:
+                </p>
+                <div class="superset-link-list">
+                    ${candidates.map(s => {
+                        const exercise = state.exercises.find(e => e.id === s.exercise_id);
+                        const alreadyLinked = s.superset_id ? ' • bereits Supersatz' : '';
+                        return `
+                            <button class="superset-link-option" onclick="linkSetsAsSuperset(${sourceSet.id}, ${s.id})">
+                                <div class="superset-link-name">${getExerciseIcon(exercise)} ${s.exercise_name}</div>
+                                <div class="superset-link-meta">Satz ${s.set_number}: ${s.weight}kg × ${s.reps}${alreadyLinked}</div>
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
+async function linkSetsAsSuperset(setId, targetSetId) {
+    const currentExerciseId = state.currentExercise?.id;
+
+    try {
+        await api('sets/link', {
+            method: 'POST',
+            body: JSON.stringify({ setId, targetSetId })
+        });
+
+        closeModal('linkSupersetModal');
+        showToast('Supersatz verknüpft');
+
+        // Reload to keep state consistent (inkl. möglicher Merge)
+        await loadData();
+
+        if (currentExerciseId) {
+            openExerciseModal(currentExerciseId);
+        }
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function unlinkSetFromSuperset(setId) {
+    const currentExerciseId = state.currentExercise?.id;
+
+    try {
+        await api(`sets/${setId}/superset`, {
+            method: 'PUT',
+            body: JSON.stringify({ superset_id: null })
+        });
+
+        const set = state.sets.find(s => s.id === setId);
+        if (set) set.superset_id = null;
+
+        showToast('Supersatz entfernt');
+
+        if (currentExerciseId) {
+            openExerciseModal(currentExerciseId);
+        }
+        renderWorkoutView();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
 function renderExercisesView() {
     const searchTerm = elements.exerciseSearch?.value?.toLowerCase() || '';
     
@@ -1073,6 +1185,7 @@ function renderProgressChart(progression) {
     const volumes = progression.map(p => Math.round(p.total_volume));
     const avgReps = progression.map(p => Math.round(p.avg_reps * 10) / 10);
     const setCounts = progression.map(p => p.set_count);
+    const hasSuperset = progression.map(p => !!p.has_superset);
     
     progressChart = new Chart(ctx, {
         type: 'line',
@@ -1087,7 +1200,10 @@ function renderProgressChart(progression) {
                     tension: 0.3,
                     fill: false,
                     yAxisID: 'y',
-                    order: 1
+                    order: 1,
+                    pointStyle: hasSuperset.map(v => v ? 'rectRot' : 'circle'),
+                    pointRadius: hasSuperset.map(v => v ? 5 : 3),
+                    pointHoverRadius: hasSuperset.map(v => v ? 6 : 4)
                 },
                 {
                     label: 'Ø Gewicht (kg)',
@@ -1171,6 +1287,11 @@ function renderProgressChart(progression) {
                                 label += context.parsed.y;
                             }
                             return label;
+                        },
+                        afterBody: function(items) {
+                            const index = items?.[0]?.dataIndex;
+                            if (index === undefined) return [];
+                            return hasSuperset[index] ? ['🔗 Supersatz'] : [];
                         }
                     }
                 }
@@ -1293,13 +1414,21 @@ function openExerciseModal(exerciseId) {
                     <div class="history-card">
                         <div class="history-card-header">${formatDateFullCompact(workout.date)}</div>
                         <div class="last-sets-list">
-                            ${workout.sets.map(set => `
-                                <div class="last-set-row ${set.set_number === nextSetNumber ? 'highlighted' : ''}">
+                            ${workout.sets.map(set => {
+                                const partners = getSupersetPartners(set);
+                                const hasSuperset = partners.length > 0;
+                                return `
+                                <div class="last-set-row ${set.set_number === nextSetNumber ? 'highlighted' : ''} ${hasSuperset ? 'has-superset' : ''}">
                                     <span class="set-number">${set.set_number}</span>
                                     <span class="set-metric"><span class="weight">${set.weight}kg</span><span class="reps">×${set.reps}</span></span>
                                     <span class="set-difficulty">${getDifficultyEmoji(set.difficulty)}</span>
+                                    ${hasSuperset ? `
+                                        <span class="superset-indicator small" title="Supersatz mit: ${partners.map(p => p.exercise_name).join(', ')}"
+                                              onclick="event.stopPropagation(); showSupersetInfo('${set.superset_id}')">🔗</span>
+                                    ` : ''}
                                 </div>
-                            `).join('')}
+                            `;
+                            }).join('')}
                         </div>
                     </div>
                 `).join('')}
@@ -1338,6 +1467,8 @@ function openExerciseModal(exerciseId) {
                         </span>
                     ` : ''}
                     <div class="set-actions">
+                        <button class="set-action-btn" onclick="openLinkSupersetModal(${set.id})" title="Supersatz verknüpfen">⛓️</button>
+                        ${set.superset_id ? `<button class="set-action-btn" onclick="unlinkSetFromSuperset(${set.id})" title="Supersatz entfernen">🔓</button>` : ''}
                         <button class="set-action-btn" onclick="editSet(${set.id})">✏️</button>
                         <button class="set-action-btn delete" onclick="deleteSet(${set.id})">🗑️</button>
                     </div>
@@ -1752,6 +1883,7 @@ async function addSet() {
             weight,
             reps,
             difficulty,
+            superset_id: result.superset_id || null,
             created_at: result.created_at || new Date().toISOString()
         });
         

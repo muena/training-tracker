@@ -1432,3 +1432,46 @@ body {
     color: var(--text-secondary);
     font-size: 14px;
 }
+
+.last-set-row.has-superset {
+    border-left: 3px solid var(--primary);
+    padding-left: 9px;
+}
+
+.superset-indicator.small {
+    font-size: 14px;
+    padding: 2px 4px;
+    margin-left: 6px;
+}
+
+.superset-link-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.superset-link-option {
+    width: 100%;
+    text-align: left;
+    background: var(--bg-input);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.superset-link-option:hover {
+    border-color: var(--primary);
+    background: var(--bg-card);
+}
+
+.superset-link-name {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.superset-link-meta {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
