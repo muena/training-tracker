@@ -138,6 +138,41 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
 `);
 
+// Coach Tabellen
+db.exec(`
+    CREATE TABLE IF NOT EXISTS user_goals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        goals TEXT,
+        experience_level TEXT,
+        training_frequency TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS coach_conversations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        title TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS coach_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id INTEGER NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(conversation_id) REFERENCES coach_conversations(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_coach_messages_conversation ON coach_messages(conversation_id);
+    CREATE INDEX IF NOT EXISTS idx_coach_conversations_user ON coach_conversations(user_id);
+`);
+
 console.log('Database initialized successfully');
 
 // Auth & Session Helpers
@@ -506,6 +541,101 @@ function checkUserOwnership(workoutId, userId) {
     return workout && (workout.user_id === userId || workout.user_id === null);
 }
 
+// Coach Prepared Statements
+const getUserGoalsStmt = db.prepare(`
+    SELECT * FROM user_goals WHERE user_id = ?
+`);
+
+const upsertUserGoalsStmt = db.prepare(`
+    INSERT INTO user_goals (user_id, goals, experience_level, training_frequency, updated_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET
+        goals = excluded.goals,
+        experience_level = excluded.experience_level,
+        training_frequency = excluded.training_frequency,
+        updated_at = datetime('now')
+`);
+
+const getConversationsStmt = db.prepare(`
+    SELECT c.*, 
+           (SELECT content FROM coach_messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message
+    FROM coach_conversations c
+    WHERE c.user_id = ?
+    ORDER BY c.updated_at DESC
+`);
+
+const getConversationStmt = db.prepare(`
+    SELECT * FROM coach_conversations WHERE id = ? AND user_id = ?
+`);
+
+const createConversationStmt = db.prepare(`
+    INSERT INTO coach_conversations (user_id, title) VALUES (?, ?)
+`);
+
+const updateConversationStmt = db.prepare(`
+    UPDATE coach_conversations SET title = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?
+`);
+
+const deleteConversationStmt = db.prepare(`
+    DELETE FROM coach_conversations WHERE id = ? AND user_id = ?
+`);
+
+const getMessagesStmt = db.prepare(`
+    SELECT * FROM coach_messages WHERE conversation_id = ? ORDER BY created_at ASC
+`);
+
+const addMessageStmt = db.prepare(`
+    INSERT INTO coach_messages (conversation_id, role, content) VALUES (?, ?, ?)
+`);
+
+const touchConversationStmt = db.prepare(`
+    UPDATE coach_conversations SET updated_at = datetime('now') WHERE id = ?
+`);
+
+// Coach: Workout-Zusammenfassung für Kontext
+function getWorkoutSummaryForCoach(userId, limit = 20) {
+    const workouts = db.prepare(`
+        SELECT w.id, w.date,
+               GROUP_CONCAT(DISTINCT e.name) as exercises,
+               COUNT(s.id) as total_sets,
+               SUM(s.weight * s.reps) as total_volume
+        FROM workouts w
+        LEFT JOIN sets s ON w.id = s.workout_id
+        LEFT JOIN exercises e ON s.exercise_id = e.id
+        WHERE w.user_id = ? OR w.user_id IS NULL
+        GROUP BY w.id
+        ORDER BY w.date DESC
+        LIMIT ?
+    `).all(userId, limit);
+    
+    return workouts;
+}
+
+function getExerciseProgressForCoach(userId) {
+    // Hole für jede Übung: Erster Eintrag, letzter Eintrag, max Gewicht
+    const progress = db.prepare(`
+        SELECT 
+            e.name as exercise_name,
+            e.muscle_groups,
+            COUNT(DISTINCT w.id) as workout_count,
+            COUNT(s.id) as total_sets,
+            MIN(w.date) as first_date,
+            MAX(w.date) as last_date,
+            MAX(s.weight) as max_weight,
+            ROUND(AVG(s.weight), 1) as avg_weight,
+            ROUND(AVG(s.reps), 1) as avg_reps
+        FROM exercises e
+        LEFT JOIN sets s ON e.id = s.exercise_id
+        LEFT JOIN workouts w ON s.workout_id = w.id
+        WHERE (e.user_id = ? OR e.user_id IS NULL)
+          AND s.id IS NOT NULL
+        GROUP BY e.id
+        ORDER BY workout_count DESC
+    `).all(userId);
+    
+    return progress;
+}
+
 module.exports = {
     db,
     
@@ -659,5 +789,35 @@ module.exports = {
     },
     
     // Utility
-    close: () => db.close()
+    close: () => db.close(),
+    
+    // Coach
+    getUserGoals: (userId) => getUserGoalsStmt.get(userId),
+    saveUserGoals: (userId, goals, experienceLevel, trainingFrequency) => {
+        upsertUserGoalsStmt.run(userId, goals, experienceLevel, trainingFrequency);
+        return getUserGoalsStmt.get(userId);
+    },
+    
+    getConversations: (userId) => getConversationsStmt.all(userId),
+    getConversation: (id, userId) => getConversationStmt.get(id, userId),
+    createConversation: (userId, title = 'Neue Unterhaltung') => {
+        const result = createConversationStmt.run(userId, title);
+        return { id: result.lastInsertRowid, user_id: userId, title };
+    },
+    updateConversationTitle: (id, title, userId) => {
+        updateConversationStmt.run(title, id, userId);
+    },
+    deleteConversation: (id, userId) => {
+        return deleteConversationStmt.run(id, userId);
+    },
+    
+    getMessages: (conversationId) => getMessagesStmt.all(conversationId),
+    addMessage: (conversationId, role, content) => {
+        const result = addMessageStmt.run(conversationId, role, content);
+        touchConversationStmt.run(conversationId);
+        return { id: result.lastInsertRowid, conversation_id: conversationId, role, content };
+    },
+    
+    getWorkoutSummaryForCoach,
+    getExerciseProgressForCoach
 };

@@ -13,7 +13,15 @@ const state = {
     currentExercise: null,  // Aktuell ausgewählte Übung für Modal
     loading: true,
     statsPeriod: '1m',      // Standard: 1 Monat
-    statsData: null         // Statistik-Daten vom Server
+    statsData: null,        // Statistik-Daten vom Server
+    // Coach State
+    coach: {
+        goals: null,
+        conversations: [],
+        currentConversationId: null,
+        messages: [],
+        isLoading: false
+    }
 };
 
 // ============================================
@@ -2149,6 +2157,11 @@ function switchView(viewName) {
     if (viewName === 'stats') {
         loadStats();
     }
+    
+    // Load coach data when switching to coach view
+    if (viewName === 'coach') {
+        loadCoachData();
+    }
 }
 
 // ============================================
@@ -2221,5 +2234,321 @@ document.addEventListener('keydown', (e) => {
         closeModal('changeDateModal');
         closeModal('editSetModal');
         closeModal('datePickerModal');
+        closeModal('conversationHistoryModal');
     }
 });
+
+// ============================================
+// Coach Functions
+// ============================================
+
+async function loadCoachData() {
+    try {
+        const [goalsRes, conversationsRes] = await Promise.all([
+            api('coach/goals'),
+            api('coach/conversations')
+        ]);
+        
+        state.coach.goals = goalsRes.goals;
+        state.coach.conversations = conversationsRes.conversations || [];
+        
+        // Update goals form
+        if (state.coach.goals) {
+            document.getElementById('userGoals').value = state.coach.goals.goals || '';
+            document.getElementById('experienceLevel').value = state.coach.goals.experience_level || '';
+            document.getElementById('trainingFrequency').value = state.coach.goals.training_frequency || '';
+        }
+        
+        // Enable chat input
+        setupChatInput();
+    } catch (error) {
+        console.error('Error loading coach data:', error);
+    }
+}
+
+function setupChatInput() {
+    const input = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendChatBtn');
+    
+    if (input && sendBtn) {
+        input.addEventListener('input', () => {
+            sendBtn.disabled = !input.value.trim();
+            // Auto-resize textarea
+            input.style.height = 'auto';
+            input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+        });
+    }
+}
+
+function toggleGoalsSection() {
+    const content = document.getElementById('goalsContent');
+    const toggle = document.querySelector('.goals-toggle');
+    
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        toggle.classList.add('open');
+    } else {
+        content.style.display = 'none';
+        toggle.classList.remove('open');
+    }
+}
+
+async function saveGoals() {
+    const goals = document.getElementById('userGoals').value;
+    const experienceLevel = document.getElementById('experienceLevel').value;
+    const trainingFrequency = document.getElementById('trainingFrequency').value;
+    
+    try {
+        const result = await api('coach/goals', {
+            method: 'POST',
+            body: JSON.stringify({
+                goals,
+                experience_level: experienceLevel,
+                training_frequency: trainingFrequency
+            })
+        });
+        
+        state.coach.goals = result.goals;
+        
+        // Close goals section
+        toggleGoalsSection();
+        
+        // Show success feedback
+        showToast('Ziele gespeichert!');
+    } catch (error) {
+        showError('Fehler beim Speichern: ' + error.message);
+    }
+}
+
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--success);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        z-index: 10000;
+        animation: fadeInOut 2s ease-in-out;
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+}
+
+function handleChatKeydown(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendChatMessage();
+    }
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    
+    if (!message || state.coach.isLoading) return;
+    
+    // Clear input
+    input.value = '';
+    input.style.height = 'auto';
+    document.getElementById('sendChatBtn').disabled = true;
+    
+    // Add user message to UI
+    addMessageToUI('user', message);
+    
+    // Hide welcome screen
+    const welcome = document.querySelector('.chat-welcome');
+    if (welcome) welcome.style.display = 'none';
+    
+    // Show typing indicator
+    const typingIndicator = addTypingIndicator();
+    
+    state.coach.isLoading = true;
+    
+    try {
+        const result = await api('coach/chat', {
+            method: 'POST',
+            body: JSON.stringify({
+                conversation_id: state.coach.currentConversationId,
+                message: message
+            })
+        });
+        
+        // Remove typing indicator
+        typingIndicator.remove();
+        
+        // Update conversation ID if new
+        if (!state.coach.currentConversationId) {
+            state.coach.currentConversationId = result.conversation_id;
+            document.getElementById('chatTitle').textContent = '💬 Chat';
+        }
+        
+        // Add assistant response
+        addMessageToUI('assistant', result.response);
+        
+    } catch (error) {
+        typingIndicator.remove();
+        addMessageToUI('assistant', '❌ Fehler: ' + error.message);
+    } finally {
+        state.coach.isLoading = false;
+    }
+}
+
+function sendQuickPrompt(prompt) {
+    document.getElementById('chatInput').value = prompt;
+    document.getElementById('sendChatBtn').disabled = false;
+    sendChatMessage();
+}
+
+function addMessageToUI(role, content) {
+    const messagesContainer = document.getElementById('chatMessages');
+    const messageEl = document.createElement('div');
+    messageEl.className = `chat-message ${role}`;
+    
+    // Simple markdown-like formatting
+    let formattedContent = content
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
+    
+    messageEl.innerHTML = formattedContent;
+    messagesContainer.appendChild(messageEl);
+    
+    // Scroll to bottom
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function addTypingIndicator() {
+    const messagesContainer = document.getElementById('chatMessages');
+    const indicator = document.createElement('div');
+    indicator.className = 'chat-message assistant typing';
+    indicator.innerHTML = '<span></span><span></span><span></span>';
+    messagesContainer.appendChild(indicator);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    return indicator;
+}
+
+function startNewConversation() {
+    state.coach.currentConversationId = null;
+    state.coach.messages = [];
+    
+    const messagesContainer = document.getElementById('chatMessages');
+    messagesContainer.innerHTML = `
+        <div class="chat-welcome">
+            <div class="coach-avatar">🏋️</div>
+            <h3>Hallo! Ich bin dein TrainBot.</h3>
+            <p>Ich kann dir helfen mit:</p>
+            <ul>
+                <li>📋 Trainingspläne erstellen</li>
+                <li>📊 Fortschritt analysieren</li>
+                <li>💡 Trainingsempfehlungen</li>
+                <li>❓ Fragen beantworten</li>
+            </ul>
+            <div class="quick-prompts">
+                <button onclick="sendQuickPrompt('Erstelle mir einen Trainingsplan für diese Woche')">📋 Trainingsplan erstellen</button>
+                <button onclick="sendQuickPrompt('Analysiere meinen Fortschritt der letzten Wochen')">📊 Fortschritt analysieren</button>
+                <button onclick="sendQuickPrompt('Was sollte ich heute trainieren?')">💪 Workout-Empfehlung</button>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('chatTitle').textContent = '💬 Neuer Chat';
+}
+
+async function showConversationHistory() {
+    try {
+        const result = await api('coach/conversations');
+        state.coach.conversations = result.conversations || [];
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'conversationHistoryModal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 450px;">
+                <div class="modal-header">
+                    <h2>📋 Chat-Verlauf</h2>
+                    <button class="close-modal" onclick="closeModal('conversationHistoryModal')">×</button>
+                </div>
+                <div class="modal-body">
+                    ${state.coach.conversations.length === 0 ? `
+                        <p style="color: var(--text-secondary); text-align: center; padding: 20px;">
+                            Noch keine Unterhaltungen vorhanden.
+                        </p>
+                    ` : `
+                        <div class="conversation-list">
+                            ${state.coach.conversations.map(conv => `
+                                <div class="conversation-item ${conv.id === state.coach.currentConversationId ? 'active' : ''}" 
+                                     onclick="loadConversation(${conv.id})">
+                                    <div class="conversation-info">
+                                        <div class="conversation-title">${conv.title || 'Unterhaltung'}</div>
+                                        <div class="conversation-preview">${conv.last_message ? conv.last_message.substring(0, 50) + '...' : ''}</div>
+                                    </div>
+                                    <button class="conversation-delete" onclick="event.stopPropagation(); deleteConversation(${conv.id})">🗑️</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal('conversationHistoryModal');
+        });
+        
+        document.getElementById('modalContainer').appendChild(modal);
+        setTimeout(() => modal.classList.add('active'), 10);
+    } catch (error) {
+        showError('Fehler beim Laden: ' + error.message);
+    }
+}
+
+async function loadConversation(conversationId) {
+    try {
+        const result = await api(`coach/conversations/${conversationId}/messages`);
+        
+        state.coach.currentConversationId = conversationId;
+        state.coach.messages = result.messages || [];
+        
+        // Find conversation title
+        const conv = state.coach.conversations.find(c => c.id === conversationId);
+        document.getElementById('chatTitle').textContent = '💬 ' + (conv?.title || 'Chat');
+        
+        // Render messages
+        const messagesContainer = document.getElementById('chatMessages');
+        messagesContainer.innerHTML = '';
+        
+        for (const msg of state.coach.messages) {
+            addMessageToUI(msg.role, msg.content);
+        }
+        
+        closeModal('conversationHistoryModal');
+    } catch (error) {
+        showError('Fehler beim Laden: ' + error.message);
+    }
+}
+
+async function deleteConversation(conversationId) {
+    if (!confirm('Diese Unterhaltung wirklich löschen?')) return;
+    
+    try {
+        await api(`coach/conversations/${conversationId}`, { method: 'DELETE' });
+        
+        // If deleting current conversation, start new one
+        if (state.coach.currentConversationId === conversationId) {
+            startNewConversation();
+        }
+        
+        // Refresh the modal
+        closeModal('conversationHistoryModal');
+        showConversationHistory();
+    } catch (error) {
+        showError('Fehler beim Löschen: ' + error.message);
+    }
+}

@@ -12,6 +12,7 @@ const AUTH_ENABLED = process.env.AUTH_ENABLED !== 'false';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_REDIRECT_URI_ENV = process.env.GOOGLE_REDIRECT_URI;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 // Datenbank laden
 const db = require('./database');
@@ -84,6 +85,95 @@ function parseBody(req) {
     });
 }
 
+// OpenAI Coach Integration
+async function callOpenAI(userMessage, previousMessages, goals, workoutSummary, exerciseProgress, userName) {
+    const systemPrompt = buildCoachSystemPrompt(goals, workoutSummary, exerciseProgress, userName);
+    
+    // Konvertiere bisherige Nachrichten ins OpenAI-Format
+    const messages = [
+        { role: 'system', content: systemPrompt },
+        ...previousMessages.slice(-20).map(m => ({ // Letzte 20 Nachrichten als Kontext
+            role: m.role,
+            content: m.content
+        })),
+        { role: 'user', content: userMessage }
+    ];
+    
+    try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o',
+                messages: messages,
+                max_tokens: 1500,
+                temperature: 0.7
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('OpenAI API Error:', error);
+            throw new Error(error.error?.message || 'OpenAI API Fehler');
+        }
+        
+        const data = await response.json();
+        return data.choices[0].message.content;
+    } catch (error) {
+        console.error('OpenAI Call Error:', error);
+        throw error;
+    }
+}
+
+function buildCoachSystemPrompt(goals, workoutSummary, exerciseProgress, userName) {
+    const goalsText = goals ? `
+Fitnessziele des Users:
+- Ziele: ${goals.goals || 'Nicht angegeben'}
+- Erfahrungslevel: ${goals.experience_level || 'Nicht angegeben'}
+- Trainingsfrequenz: ${goals.training_frequency || 'Nicht angegeben'}
+` : 'Der User hat noch keine Fitnessziele definiert.';
+
+    const workoutText = workoutSummary.length > 0 ? `
+Letzte ${workoutSummary.length} Trainingseinheiten:
+${workoutSummary.map(w => `- ${w.date}: ${w.exercises || 'Keine Übungen'} (${w.total_sets} Sätze, ${Math.round(w.total_volume || 0)}kg Volumen)`).join('\n')}
+` : 'Noch keine Trainingseinheiten aufgezeichnet.';
+
+    const progressText = exerciseProgress.length > 0 ? `
+Übungsfortschritt:
+${exerciseProgress.slice(0, 15).map(e => 
+    `- ${e.exercise_name}: ${e.workout_count} Workouts, Max ${e.max_weight}kg, Ø ${e.avg_weight}kg × ${e.avg_reps} Wdh${e.muscle_groups ? ` (${e.muscle_groups})` : ''}`
+).join('\n')}
+` : 'Noch keine Übungsdaten vorhanden.';
+
+    return `Du bist ein erfahrener, motivierender Fitness-Coach namens "TrainBot". Du hilfst ${userName || 'dem User'} dabei, seine Trainingsziele zu erreichen.
+
+DEINE AUFGABEN:
+1. Trainingspläne erstellen (Wochenpläne mit konkreten Übungen, Sätzen, Wiederholungen)
+2. Einzelne Workout-Empfehlungen geben
+3. Fortschrittsanalysen durchführen ("Wie entwickelt sich mein Bankdrücken?")
+4. Allgemeine Trainingsfragen beantworten
+5. Motivation und Tipps geben
+
+WICHTIGE REGELN:
+- Antworte auf Deutsch
+- Sei konkret und praktisch orientiert
+- Beziehe dich auf die vorhandenen Trainingsdaten
+- Gib keine Ernährungstipps (außer explizit gefragt)
+- Formatiere Trainingspläne übersichtlich
+- Bei Trainingsplänen: Nutze die Übungen, die der User bereits macht, wo sinnvoll
+- Sei motivierend aber realistisch
+
+TRAININGSDATEN DES USERS:
+${goalsText}
+${workoutText}
+${progressText}
+
+Antworte kurz und prägnant, außer bei komplexen Fragen wie Trainingsplan-Erstellung.`;
+}
+
 // API Handler
 async function handleApi(req, res, endpoint, user) {
     try {
@@ -129,8 +219,21 @@ async function handleApi(req, res, endpoint, user) {
                         name: user.name, 
                         picture: user.picture 
                     });
+                
+                // Coach Endpoints
+                case 'coach/goals':
+                    return jsonResponse(res, 200, { goals: db.getUserGoals(userId) });
+                
+                case 'coach/conversations':
+                    return jsonResponse(res, 200, { conversations: db.getConversations(userId) });
 
                 default:
+                    if (endpoint.startsWith('coach/conversations/') && endpoint.endsWith('/messages')) {
+                        const convId = parseInt(endpoint.split('/')[2]);
+                        const conv = db.getConversation(convId, userId);
+                        if (!conv) return jsonResponse(res, 404, { error: 'Conversation not found' });
+                        return jsonResponse(res, 200, { messages: db.getMessages(convId) });
+                    }
                     return jsonResponse(res, 404, { error: 'Unknown endpoint' });
             }
         }
@@ -250,6 +353,69 @@ async function handleApi(req, res, endpoint, user) {
                     res.end(JSON.stringify({ success: true }));
                     return;
                 }
+                
+                // Coach Endpoints
+                case 'coach/goals': {
+                    const { goals, experience_level, training_frequency } = body;
+                    const result = db.saveUserGoals(userId, goals, experience_level, training_frequency);
+                    return jsonResponse(res, 200, { goals: result });
+                }
+                
+                case 'coach/conversations': {
+                    const { title } = body;
+                    const result = db.createConversation(userId, title || 'Neue Unterhaltung');
+                    return jsonResponse(res, 201, { conversation: result });
+                }
+                
+                case 'coach/chat': {
+                    if (!OPENAI_API_KEY) {
+                        return jsonResponse(res, 500, { error: 'OpenAI API nicht konfiguriert' });
+                    }
+                    
+                    const { conversation_id, message } = body;
+                    if (!message) {
+                        return jsonResponse(res, 400, { error: 'Nachricht erforderlich' });
+                    }
+                    
+                    // Conversation finden oder erstellen
+                    let convId = conversation_id;
+                    if (!convId) {
+                        const conv = db.createConversation(userId, message.substring(0, 50) + '...');
+                        convId = conv.id;
+                    } else {
+                        const conv = db.getConversation(convId, userId);
+                        if (!conv) {
+                            return jsonResponse(res, 404, { error: 'Conversation not found' });
+                        }
+                    }
+                    
+                    // User-Nachricht speichern
+                    db.addMessage(convId, 'user', message);
+                    
+                    // Kontext aufbauen
+                    const goals = db.getUserGoals(userId);
+                    const workoutSummary = db.getWorkoutSummaryForCoach(userId, 30);
+                    const exerciseProgress = db.getExerciseProgressForCoach(userId);
+                    const previousMessages = db.getMessages(convId);
+                    
+                    // OpenAI API aufrufen
+                    const assistantResponse = await callOpenAI(
+                        message, 
+                        previousMessages, 
+                        goals, 
+                        workoutSummary, 
+                        exerciseProgress,
+                        user.name
+                    );
+                    
+                    // Assistant-Antwort speichern
+                    db.addMessage(convId, 'assistant', assistantResponse);
+                    
+                    return jsonResponse(res, 200, { 
+                        conversation_id: convId,
+                        response: assistantResponse 
+                    });
+                }
 
                 default:
                     return jsonResponse(res, 404, { error: 'Unknown endpoint' });
@@ -331,6 +497,14 @@ async function handleApi(req, res, endpoint, user) {
                 
                 const result = db.deleteExercise(id, userId);
                 if (result.changes === 0) return jsonResponse(res, 403, { error: 'Not allowed or not found' });
+                return jsonResponse(res, 200, { success: true });
+            }
+            
+            if (endpoint.startsWith('coach/conversations/')) {
+                const id = parseInt(endpoint.split('/')[2]);
+                if (!id) return jsonResponse(res, 400, { error: 'ID required' });
+                
+                const result = db.deleteConversation(id, userId);
                 return jsonResponse(res, 200, { success: true });
             }
             
