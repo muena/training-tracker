@@ -331,6 +331,11 @@ async function api(endpoint, options = {}) {
         ...options
     });
     
+    if (response.status === 401) {
+        window.location.reload();
+        return;
+    }
+    
     if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'API Error');
@@ -343,22 +348,64 @@ async function loadData() {
     try {
         showLoading(true);
         
-        // Parallel laden
-        const [exercisesRes, setsRes, workoutsRes] = await Promise.all([
+        const [exercisesRes, setsRes, workoutsRes, meRes] = await Promise.all([
             api('exercises'),
             api('sets'),
-            api('workouts?limit=10')
+            api('workouts?limit=10'),
+            api('me').catch(() => null)
         ]);
         
         state.exercises = exercisesRes.exercises || [];
         state.sets = setsRes.sets || [];
         state.workouts = workoutsRes.workouts || [];
+        if (meRes) state.user = meRes;
         
         renderAll();
+        renderHeader();
     } catch (error) {
         showError(error.message);
     } finally {
         showLoading(false);
+    }
+}
+
+function renderHeader() {
+    const header = document.querySelector('.header');
+    if (document.getElementById('userProfile') || !state.user) return;
+
+    const existingBtn = header.querySelector('.icon-btn');
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.gap = '12px';
+    container.style.alignItems = 'center';
+    container.id = 'headerRight';
+    
+    if (existingBtn) {
+        existingBtn.parentNode.insertBefore(container, existingBtn);
+        container.appendChild(existingBtn);
+    } else {
+        header.appendChild(container);
+    }
+
+    const profileDiv = document.createElement('div');
+    profileDiv.id = 'userProfile';
+    profileDiv.style.display = 'flex';
+    profileDiv.style.alignItems = 'center';
+    profileDiv.style.gap = '10px';
+    
+    profileDiv.innerHTML = `
+        <img src="${state.user.picture}" alt="${state.user.name}" style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--primary);">
+        <button class="icon-btn" onclick="logout()" title="Abmelden" style="padding: 4px;">🚪</button>
+    `;
+    container.appendChild(profileDiv);
+}
+
+async function logout() {
+    try {
+        await api('auth/logout', { method: 'POST' });
+        window.location.reload();
+    } catch (e) {
+        window.location.reload();
     }
 }
 

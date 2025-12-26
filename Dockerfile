@@ -17,6 +17,7 @@ RUN npm install --only=production
 COPY server.js ./
 COPY database.js ./
 COPY index.html ./
+COPY login.html ./
 COPY app.js ./
 COPY styles.css ./
 COPY manifest.json ./
