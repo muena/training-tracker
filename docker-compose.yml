@@ -21,3 +21,14 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    container_name: training-tracker-backup
+    volumes:
+      - ./data:/data
+    depends_on:
+      - training-tracker
+    restart: unless-stopped

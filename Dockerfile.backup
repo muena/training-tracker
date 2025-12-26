@@ -1,0 +1,17 @@
+FROM alpine:latest
+
+# Install sqlite and gzip for backups
+RUN apk add --no-cache sqlite gzip
+
+# Create backup directory
+RUN mkdir -p /data/backups
+
+# Copy backup script
+COPY scripts/backup.sh /backup.sh
+RUN chmod +x /backup.sh
+
+# Setup crontab - hourly at minute 0
+RUN echo "0 * * * * /backup.sh >> /data/backups/backup.log 2>&1" > /etc/crontabs/root
+
+# Run crond in foreground with log level 2 (warnings and above)
+CMD ["crond", "-f", "-l", "2"]
