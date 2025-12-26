@@ -1,8 +1,8 @@
 # Use official Node.js LTS image with build tools for better-sqlite3
 FROM node:20-alpine
 
-# Install build dependencies for better-sqlite3
-RUN apk add --no-cache python3 make g++
+# Install build dependencies for better-sqlite3 and sqlite3 CLI for backups
+RUN apk add --no-cache python3 make g++ sqlite
 
 # Set working directory
 WORKDIR /app
@@ -23,8 +23,11 @@ COPY styles.css ./
 COPY manifest.json ./
 COPY scripts ./scripts
 
-# Create data directory
-RUN mkdir -p /app/data
+# Create data and backup directories
+RUN mkdir -p /app/data /app/data/backups
+
+# Make backup script executable
+RUN chmod +x /app/scripts/backup.sh
 
 # Expose port
 EXPOSE 8765
