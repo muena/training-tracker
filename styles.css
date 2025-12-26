@@ -335,6 +335,21 @@ body {
     font-size: 14px;
 }
 
+.set-pill.superset {
+    border: 1px solid var(--primary);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.set-pill.superset:hover {
+    background: var(--primary-dark);
+}
+
+.set-pill .superset-icon {
+    font-size: 12px;
+    margin-right: 2px;
+}
+
 /* Add Exercise Button */
 .add-exercise-btn {
     width: 100%;

@@ -584,7 +584,8 @@ function renderWorkoutView() {
                 ${hasSetsToday ? `
                     <div class="today-sets">
                         ${exercise.sets.map((s, i) => `
-                            <span class="set-pill">
+                            <span class="set-pill${s.superset_id ? ' superset' : ''}" ${s.superset_id ? `onclick="event.stopPropagation(); showSupersetInfo('${s.superset_id}')"` : ''}>
+                                ${s.superset_id ? '<span class="superset-icon">🔗</span>' : ''}
                                 <span class="weight">${s.weight}kg</span>
                                 <span class="reps">×${s.reps}</span>
                                 <span class="diff">${getDifficultyEmoji(s.difficulty)}</span>
