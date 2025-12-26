@@ -135,6 +135,11 @@ Available values for `muscle_groups`:
 
 ### Supersets
 Sets can be linked via `superset_id` (UUID). All sets with the same `superset_id` were performed together as a superset.
+- **Linking:** Manually via UI (chain icon). Backend merges supersets if linking two existing supersets.
+- **Unlinking:** Via UI (unlock icon) with confirmation dialog.
+- **Visualization:**
+  - 🔗 Icon in Set list (today & history)
+  - Visual marker in Progress Chart (square vs circle points)
 
 ## REST API Endpoints
 
@@ -143,23 +148,31 @@ Sets can be linked via `superset_id` (UUID). All sets with the same `superset_id
 - `GET /api/workouts?limit=N` - Last N workouts
 - `GET /api/sets` - All sets with details
 - `GET /api/stats` - Overall + exercise statistics
-- `GET /api/stats/exercise?id=N` - Weight progression for exercise
+- `GET /api/stats/exercise?id=N` - Weight progression for exercise (includes `has_superset` flag)
 
 ### POST Endpoints
 - `POST /api/exercises` - Create exercise `{name}`
 - `POST /api/workouts` - Create workout `{date}`
 - `POST /api/sets` - Create set `{workoutDate, exerciseId, setNumber, weight, reps, difficulty}`
+- `POST /api/sets/link` - Link two sets `{setId, targetSetId}`
 
 ### PUT/PATCH Endpoints
 - `PUT /api/exercises/:id` - Update exercise `{name, icon, muscle_groups}`
 - `PUT /api/sets/:id` - Update set `{weight, reps, difficulty}`
-- `PUT /api/sets/:id/superset` - Link/unlink superset `{superset_id}`
+- `PUT /api/sets/:id/superset` - Unlink superset (pass `null`)
 
 ### DELETE Endpoints
 - `DELETE /api/exercises/:id` - Delete exercise (and all linked sets)
 - `DELETE /api/sets/:id` - Delete set
 
 ## Frontend Architecture
+
+### UI Components
+- **Superset Linking:** Grouped list of today's sets by exercise
+- **Responsive Design:**
+  - **Mobile:** Mobile-first vertical layout
+  - **Desktop/Tablet (>768px):** Grid layout for exercises, centered modals, max-width 1200px
+  - **Landscape Mobile:** Optimized modal height
 
 ### State Management
 ```javascript

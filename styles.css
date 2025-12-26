@@ -1450,30 +1450,44 @@ body {
     gap: 10px;
 }
 
+.superset-link-group {
+    margin-bottom: 12px;
+}
+
+.superset-link-group-title {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
 .superset-link-option {
     width: 100%;
     text-align: left;
     background: var(--bg-input);
     border: 2px solid var(--border);
-    border-radius: 10px;
-    padding: 12px;
+    border-radius: 8px;
+    padding: 10px 12px;
     cursor: pointer;
     transition: border-color 0.15s, background 0.15s;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.superset-link-option:hover {
-    border-color: var(--primary);
-    background: var(--bg-card);
+.superset-link-option:last-child {
+    margin-bottom: 0;
 }
 
-.superset-link-name {
+.superset-link-option .set-number {
     font-weight: 600;
-    margin-bottom: 4px;
+    color: var(--text-secondary);
+    margin-right: 10px;
 }
 
-.superset-link-meta {
-    color: var(--text-secondary);
-    font-size: 13px;
+.superset-link-option .set-meta {
+    color: var(--text-primary);
 }
 
 /* Desktop & Tablet Optimizations */

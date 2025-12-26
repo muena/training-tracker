@@ -606,35 +606,35 @@ function showSupersetInfo(supersetId) {
 }
 
 function getSupersetLinkCandidates(sourceSet) {
-    // Candidates = letzte Sätze anderer Übungen vom aktuellen Datum
+    // Alle Sets vom gleichen Tag, außer dem aktuellen Set selbst
+    // und Sets der gleichen Übung (die kann man meist nicht verknüpfen, außer man macht Zirkel mit gleichen Übungen?)
+    // Normalerweise supersettet man verschiedene Übungen.
     const sameDaySets = state.sets.filter(s => s.workout_date === state.currentDate);
-
     const candidates = sameDaySets.filter(s => s.id !== sourceSet.id && s.exercise_id !== sourceSet.exercise_id);
 
-    // Nur den jeweils neuesten Satz pro Übung anbieten (mobile-friendly)
-    const latestByExercise = new Map();
+    // Gruppiere nach Übung
+    const byExercise = new Map();
     candidates.forEach(s => {
-        const existing = latestByExercise.get(s.exercise_id);
-        if (!existing) {
-            latestByExercise.set(s.exercise_id, s);
-            return;
+        if (!byExercise.has(s.exercise_id)) {
+            byExercise.set(s.exercise_id, []);
         }
-        const existingTime = new Date(existing.created_at).getTime();
-        const currentTime = new Date(s.created_at).getTime();
-        if (currentTime > existingTime) {
-            latestByExercise.set(s.exercise_id, s);
-        }
+        byExercise.get(s.exercise_id).push(s);
     });
 
-    return [...latestByExercise.values()].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    // Sortiere Sets innerhalb der Übung nach Set-Nummer
+    for (const sets of byExercise.values()) {
+        sets.sort((a, b) => a.set_number - b.set_number);
+    }
+
+    return byExercise;
 }
 
 function openLinkSupersetModal(setId) {
     const sourceSet = state.sets.find(s => s.id === setId);
     if (!sourceSet) return;
 
-    const candidates = getSupersetLinkCandidates(sourceSet);
-    if (candidates.length === 0) {
+    const candidatesByExercise = getSupersetLinkCandidates(sourceSet);
+    if (candidatesByExercise.size === 0) {
         showToast('Keine Sätze zum Verknüpfen gefunden (heute)', 'error');
         return;
     }
@@ -642,6 +642,35 @@ function openLinkSupersetModal(setId) {
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'linkSupersetModal';
+    
+    // HTML für die Liste generieren
+    let listHtml = '';
+    
+    // Sortiere Übungen nach Zeitpunkt des letzten Satzes (neueste oben)
+    const sortedEntries = [...candidatesByExercise.entries()].sort((a, b) => {
+        const lastSetA = a[1][a[1].length - 1];
+        const lastSetB = b[1][b[1].length - 1];
+        return new Date(lastSetB.created_at) - new Date(lastSetA.created_at);
+    });
+
+    for (const [exerciseId, sets] of sortedEntries) {
+        const exercise = state.exercises.find(e => e.id === exerciseId);
+        listHtml += `
+            <div class="superset-link-group">
+                <div class="superset-link-group-title">${getExerciseIcon(exercise)} ${exercise.name}</div>
+                ${sets.map(s => {
+                    const alreadyLinked = s.superset_id ? ' • 🔗' : '';
+                    return `
+                        <button class="superset-link-option" onclick="linkSetsAsSuperset(${sourceSet.id}, ${s.id})">
+                            <span class="set-number">#${s.set_number}</span>
+                            <span class="set-meta">${s.weight}kg × ${s.reps} ${getDifficultyEmoji(s.difficulty)}${alreadyLinked}</span>
+                        </button>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
     modal.innerHTML = `
         <div class="modal-content" style="max-width: 420px;">
             <div class="modal-header">
@@ -650,19 +679,10 @@ function openLinkSupersetModal(setId) {
             </div>
             <div class="modal-body">
                 <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 14px;">
-                    Wähle einen Satz (neuester Satz je Übung) zum Verknüpfen:
+                    Wähle einen Partner-Satz:
                 </p>
                 <div class="superset-link-list">
-                    ${candidates.map(s => {
-                        const exercise = state.exercises.find(e => e.id === s.exercise_id);
-                        const alreadyLinked = s.superset_id ? ' • bereits Supersatz' : '';
-                        return `
-                            <button class="superset-link-option" onclick="linkSetsAsSuperset(${sourceSet.id}, ${s.id})">
-                                <div class="superset-link-name">${getExerciseIcon(exercise)} ${s.exercise_name}</div>
-                                <div class="superset-link-meta">Satz ${s.set_number}: ${s.weight}kg × ${s.reps}${alreadyLinked}</div>
-                            </button>
-                        `;
-                    }).join('')}
+                    ${listHtml}
                 </div>
             </div>
         </div>
@@ -695,6 +715,10 @@ async function linkSetsAsSuperset(setId, targetSetId) {
 }
 
 async function unlinkSetFromSuperset(setId) {
+    if (!confirm('Möchtest du diesen Satz wirklich aus dem Supersatz lösen?')) {
+        return;
+    }
+
     const currentExerciseId = state.currentExercise?.id;
 
     try {
