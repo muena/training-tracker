@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 8765;
 const AUTH_ENABLED = process.env.AUTH_ENABLED !== 'false';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || `http://localhost:${PORT}/auth/google/callback`;
+const GOOGLE_REDIRECT_URI_ENV = process.env.GOOGLE_REDIRECT_URI;
 
 // Datenbank laden
 const db = require('./database');
@@ -358,20 +358,26 @@ const server = http.createServer(async (req, res) => {
         return;
     }
     
-    const url = new URL(req.url, `http://${req.headers.host}`);
+    // Determine protocol and host respecting reverse proxy headers
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const url = new URL(req.url, `${protocol}://${host}`);
     const urlPath = url.pathname;
 
     // 1. Google OAuth Flow
     if (urlPath === '/auth/google') {
         if (!GOOGLE_CLIENT_ID) return jsonResponse(res, 500, { error: 'Google Auth not configured' });
         
-        const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(GOOGLE_REDIRECT_URI)}&response_type=code&scope=email%20profile`;
+        const redirectUri = GOOGLE_REDIRECT_URI_ENV || `${protocol}://${host}/auth/google/callback`;
+        const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=email%20profile`;
         return redirect(res, redirectUrl);
     }
 
     if (urlPath === '/auth/google/callback') {
         const code = url.searchParams.get('code');
         if (!code) return jsonResponse(res, 400, { error: 'No code provided' });
+
+        const redirectUri = GOOGLE_REDIRECT_URI_ENV || `${protocol}://${host}/auth/google/callback`;
 
         try {
             // 1. Exchange code for token
@@ -382,7 +388,7 @@ const server = http.createServer(async (req, res) => {
                     client_id: GOOGLE_CLIENT_ID,
                     client_secret: GOOGLE_CLIENT_SECRET,
                     code,
-                    redirect_uri: GOOGLE_REDIRECT_URI,
+                    redirect_uri: redirectUri,
                     grant_type: 'authorization_code'
                 })
             });
