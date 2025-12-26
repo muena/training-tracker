@@ -43,7 +43,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
-    max-width: 600px;
+    max-width: 1200px;
     margin: 0 auto;
     background: var(--bg-dark);
 }
@@ -1474,4 +1474,50 @@ body {
 .superset-link-meta {
     color: var(--text-secondary);
     font-size: 13px;
+}
+
+/* Desktop & Tablet Optimizations */
+@media (min-width: 768px) {
+    /* Layout */
+    .exercise-list, 
+    .all-exercises-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 16px;
+        align-content: flex-start;
+    }
+
+    /* Modal - Center on Desktop */
+    .modal {
+        align-items: center;
+        padding: 20px;
+    }
+
+    .modal-content {
+        max-width: 600px;
+        border-radius: 24px; /* All corners rounded */
+        max-height: 85vh;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Charts - Give more space */
+    .chart-container {
+        height: 400px;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+}
+
+/* Landscape Mobile Fixes */
+@media (max-height: 500px) and (orientation: landscape) {
+    .modal {
+        align-items: flex-end;
+    }
+    
+    .modal-content {
+        max-height: 100vh;
+        border-radius: 0;
+    }
 }
