@@ -21,6 +21,7 @@ db.exec(`
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE NOT NULL,
         icon TEXT,
+        muscle_groups TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
 `);
@@ -29,6 +30,14 @@ db.exec(`
 try {
     db.exec(`ALTER TABLE exercises ADD COLUMN icon TEXT`);
     console.log('Added icon column to exercises table');
+} catch (e) {
+    // Spalte existiert bereits - ignorieren
+}
+
+// Migration: muscle_groups Spalte hinzufügen falls nicht vorhanden
+try {
+    db.exec(`ALTER TABLE exercises ADD COLUMN muscle_groups TEXT`);
+    console.log('Added muscle_groups column to exercises table');
 } catch (e) {
     // Spalte existiert bereits - ignorieren
 }
@@ -51,6 +60,7 @@ db.exec(`
         weight REAL NOT NULL DEFAULT 0,
         reps INTEGER NOT NULL DEFAULT 0,
         difficulty TEXT DEFAULT 'Mittel',
+        superset_id TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         completed_at DATETIME,
         duration_seconds INTEGER,
@@ -59,6 +69,19 @@ db.exec(`
         FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE,
         UNIQUE(workout_id, exercise_id, set_number)
     )
+`);
+
+// Migration: superset_id Spalte hinzufügen falls nicht vorhanden
+try {
+    db.exec(`ALTER TABLE sets ADD COLUMN superset_id TEXT`);
+    console.log('Added superset_id column to sets table');
+} catch (e) {
+    // Spalte existiert bereits - ignorieren
+}
+
+// Index für superset_id
+db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_sets_superset ON sets(superset_id);
 `);
 
 // Indizes
@@ -75,15 +98,15 @@ console.log('Database initialized successfully');
 
 // Übungen
 const getExercisesStmt = db.prepare(`
-    SELECT id, name, icon, created_at FROM exercises ORDER BY name
+    SELECT id, name, icon, muscle_groups, created_at FROM exercises ORDER BY name
 `);
 
 const getExerciseByIdStmt = db.prepare(`
-    SELECT id, name, icon, created_at FROM exercises WHERE id = ?
+    SELECT id, name, icon, muscle_groups, created_at FROM exercises WHERE id = ?
 `);
 
 const getExerciseByNameStmt = db.prepare(`
-    SELECT id, name, icon, created_at FROM exercises WHERE name = ?
+    SELECT id, name, icon, muscle_groups, created_at FROM exercises WHERE name = ?
 `);
 
 const insertExerciseStmt = db.prepare(`
@@ -91,7 +114,7 @@ const insertExerciseStmt = db.prepare(`
 `);
 
 const updateExerciseStmt = db.prepare(`
-    UPDATE exercises SET name = ?, icon = ? WHERE id = ?
+    UPDATE exercises SET name = ?, icon = ?, muscle_groups = ? WHERE id = ?
 `);
 
 // Workouts
@@ -114,7 +137,7 @@ const insertWorkoutStmt = db.prepare(`
 // Sätze
 const getSetsForWorkoutStmt = db.prepare(`
     SELECT 
-        s.id, s.set_number, s.weight, s.reps, s.difficulty, 
+        s.id, s.set_number, s.weight, s.reps, s.difficulty, s.superset_id,
         s.created_at, s.completed_at, s.duration_seconds, s.duration_cleaned,
         e.id as exercise_id, e.name as exercise_name
     FROM sets s
@@ -125,7 +148,7 @@ const getSetsForWorkoutStmt = db.prepare(`
 
 const getAllSetsWithDetailsStmt = db.prepare(`
     SELECT 
-        s.id, s.set_number, s.weight, s.reps, s.difficulty, 
+        s.id, s.set_number, s.weight, s.reps, s.difficulty, s.superset_id,
         s.created_at, s.completed_at, s.duration_seconds, s.duration_cleaned,
         e.id as exercise_id, e.name as exercise_name,
         w.id as workout_id, w.date as workout_date
@@ -147,13 +170,26 @@ const getLastSetForExerciseStmt = db.prepare(`
 `);
 
 const insertSetStmt = db.prepare(`
-    INSERT INTO sets (workout_id, exercise_id, set_number, weight, reps, difficulty, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO sets (workout_id, exercise_id, set_number, weight, reps, difficulty, superset_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 const insertSetSimpleStmt = db.prepare(`
-    INSERT INTO sets (workout_id, exercise_id, set_number, weight, reps, difficulty, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO sets (workout_id, exercise_id, set_number, weight, reps, difficulty, superset_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+`);
+
+const updateSetSupersetStmt = db.prepare(`
+    UPDATE sets SET superset_id = ? WHERE id = ?
+`);
+
+const getSetsWithSameSupersetStmt = db.prepare(`
+    SELECT 
+        s.id, s.set_number, s.weight, s.reps, s.difficulty, s.superset_id,
+        e.id as exercise_id, e.name as exercise_name
+    FROM sets s
+    JOIN exercises e ON s.exercise_id = e.id
+    WHERE s.superset_id = ? AND s.id != ?
 `);
 
 const updateSetStmt = db.prepare(`
@@ -371,8 +407,8 @@ module.exports = {
             throw err;
         }
     },
-    updateExercise: (id, name, icon) => {
-        updateExerciseStmt.run(name, icon || null, id);
+    updateExercise: (id, name, icon, muscleGroups) => {
+        updateExerciseStmt.run(name, icon || null, muscleGroups || null, id);
         return getExerciseByIdStmt.get(id);
     },
     
@@ -396,13 +432,13 @@ module.exports = {
     getSetsForWorkout: (workoutId) => getSetsForWorkoutStmt.all(workoutId),
     getAllSetsWithDetails: () => getAllSetsWithDetailsStmt.all(),
     getLastSetForExercise: (exerciseId, setNumber) => getLastSetForExerciseStmt.get(exerciseId, setNumber),
-    createSet: (workoutId, exerciseId, setNumber, weight, reps, difficulty, createdAt = null) => {
+    createSet: (workoutId, exerciseId, setNumber, weight, reps, difficulty, createdAt = null, supersetId = null) => {
         try {
             if (createdAt) {
-                const result = insertSetStmt.run(workoutId, exerciseId, setNumber, weight, reps, difficulty, createdAt);
+                const result = insertSetStmt.run(workoutId, exerciseId, setNumber, weight, reps, difficulty, supersetId, createdAt);
                 return { id: result.lastInsertRowid };
             }
-            const result = insertSetSimpleStmt.run(workoutId, exerciseId, setNumber, weight, reps, difficulty);
+            const result = insertSetSimpleStmt.run(workoutId, exerciseId, setNumber, weight, reps, difficulty, supersetId);
             return { id: result.lastInsertRowid };
         } catch (err) {
             if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
@@ -420,6 +456,18 @@ module.exports = {
     },
     updateSet: (id, weight, reps, difficulty) => updateSetStmt.run(weight, reps, difficulty, id),
     deleteSet: (id) => deleteSetWithRenumberTx(id),
+    
+    // Supersets
+    linkSuperset: (setId, supersetId) => {
+        updateSetSupersetStmt.run(supersetId, setId);
+    },
+    unlinkSuperset: (setId) => {
+        updateSetSupersetStmt.run(null, setId);
+    },
+    getSupersetPartners: (supersetId, excludeSetId) => {
+        if (!supersetId) return [];
+        return getSetsWithSameSupersetStmt.all(supersetId, excludeSetId);
+    },
     deleteExercise: (id) => {
         // Erst alle Sätze der Übung löschen
         db.prepare(`DELETE FROM sets WHERE exercise_id = ?`).run(id);

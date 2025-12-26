@@ -199,7 +199,7 @@ async function handleApi(req, res, endpoint) {
             
             if (endpoint.startsWith('exercises/')) {
                 const id = parseInt(endpoint.split('/')[1]);
-                const { name, icon } = body;
+                const { name, icon, muscle_groups } = body;
                 
                 if (!id) {
                     return jsonResponse(res, 400, { error: 'Exercise ID required' });
@@ -208,8 +208,26 @@ async function handleApi(req, res, endpoint) {
                     return jsonResponse(res, 400, { error: 'Name ist erforderlich' });
                 }
                 
-                const updated = db.updateExercise(id, name, icon);
+                const updated = db.updateExercise(id, name, icon, muscle_groups);
                 return jsonResponse(res, 200, updated);
+            }
+            
+            // Superset linking
+            if (endpoint.startsWith('sets/') && endpoint.endsWith('/superset')) {
+                const parts = endpoint.split('/');
+                const id = parseInt(parts[1]);
+                const { superset_id } = body;
+                
+                if (!id) {
+                    return jsonResponse(res, 400, { error: 'Set ID required' });
+                }
+                
+                if (superset_id) {
+                    db.linkSuperset(id, superset_id);
+                } else {
+                    db.unlinkSuperset(id);
+                }
+                return jsonResponse(res, 200, { success: true, id, superset_id });
             }
             
             if (endpoint.startsWith('sets/')) {

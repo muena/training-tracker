@@ -153,6 +153,162 @@ const AVAILABLE_ICONS = [
     '🔥', '💥', '⚡', '🎖️', '🏆', '💎', '🛡️', '⚔️'
 ];
 
+// Liste aller verfügbaren Muskelgruppen
+const MUSCLE_GROUPS = [
+    'Brust',
+    'Rücken',
+    'Schultern',
+    'Nacken',
+    'Bizeps',
+    'Trizeps',
+    'Unterarme',
+    'Quadrizeps',
+    'Beinbeuger',
+    'Waden',
+    'Gesäß',
+    'Adduktoren',
+    'Abduktoren',
+    'Bauch',
+    'Unterer Rücken',
+    'Cardio',
+    'Sonstige'
+];
+
+// Keyword-basierte Auto-Erkennung für Muskelgruppen (gibt Array zurück)
+function detectMuscleGroups(exerciseName) {
+    const name = exerciseName.toLowerCase();
+    const groups = [];
+    
+    // Brust
+    if (name.includes('bank') || name.includes('brust') || name.includes('flieg') || 
+        name.includes('butterfly') || name.includes('fly') || name.includes('cable cross') || 
+        name.includes('liegestütz') || name.includes('push-up') || name.includes('pushup')) {
+        // Butterfly hinterer Delta -> Schultern, nicht Brust
+        if (!name.includes('hinterer') && !name.includes('rear')) {
+            groups.push('Brust');
+        }
+    }
+    
+    // Rücken (nicht "Rückenstrecker" - das ist unterer Rücken)
+    if ((name.includes('rücken') && !name.includes('streck')) || name.includes('lat') || 
+        name.includes('ruder') || name.includes('row') || name.includes('pull') || 
+        name.includes('deadlift') || name.includes('klimmzug') || name.includes('chin') || 
+        name.includes('t-bar')) {
+        groups.push('Rücken');
+    }
+    
+    // Schultern (inkl. hinterer Delta)
+    if (name.includes('schulter') || name.includes('shoulder') || name.includes('seitheben') || 
+        name.includes('lateral') || name.includes('military') || name.includes('hinterer delta') || 
+        name.includes('rear delt') || name.includes('frontheben') || name.includes('front raise') ||
+        (name.includes('butterfly') && name.includes('hinterer'))) {
+        groups.push('Schultern');
+    }
+    
+    // Nacken
+    if (name.includes('shrug') || name.includes('nacken') || name.includes('trap')) {
+        groups.push('Nacken');
+    }
+    
+    // Bizeps
+    if (name.includes('bizeps') || name.includes('bicep') || name.includes('curl') || 
+        name.includes('hammer')) {
+        groups.push('Bizeps');
+    }
+    
+    // Trizeps
+    if (name.includes('trizeps') || name.includes('tricep') || name.includes('pushdown') || 
+        name.includes('skull') || name.includes('french') ||
+        (name.includes('drücken') && name.includes('kabel'))) {
+        groups.push('Trizeps');
+    }
+    
+    // Unterarme
+    if (name.includes('unterarm') || name.includes('forearm') || name.includes('grip') || 
+        name.includes('wrist')) {
+        groups.push('Unterarme');
+    }
+    
+    // Quadrizeps (Oberschenkel Vorderseite)
+    if (name.includes('beinstreck') || name.includes('leg extension') || 
+        name.includes('squat') || name.includes('kniebeuge') || 
+        name.includes('beinpresse') || name.includes('leg press') ||
+        name.includes('lunge') || name.includes('ausfallschritt')) {
+        groups.push('Quadrizeps');
+    }
+    
+    // Beinbeuger (Hamstrings)
+    if (name.includes('beinbeug') || name.includes('leg curl') || name.includes('hamstring') ||
+        name.includes('beinbeuger')) {
+        groups.push('Beinbeuger');
+    }
+    
+    // Waden
+    if (name.includes('wade') || name.includes('calf') || name.includes('wadenmaschine')) {
+        groups.push('Waden');
+    }
+    
+    // Gesäß
+    if (name.includes('gesäß') || name.includes('glute') || name.includes('hip thrust') || 
+        name.includes('po ')) {
+        groups.push('Gesäß');
+    }
+    
+    // Adduktoren
+    if (name.includes('addukt')) {
+        groups.push('Adduktoren');
+    }
+    
+    // Abduktoren
+    if (name.includes('abdukt')) {
+        groups.push('Abduktoren');
+    }
+    
+    // Bauch
+    if (name.includes('bauch') || name.includes('crunch') || name.includes('plank') || 
+        name.includes('sit-up') || name.includes('situp') || name.includes(' ab ') || 
+        name.includes('core')) {
+        groups.push('Bauch');
+    }
+    
+    // Unterer Rücken
+    if (name.includes('rückenstreck') || name.includes('hyperextension') || 
+        name.includes('lower back') || name.includes('good morning')) {
+        groups.push('Unterer Rücken');
+    }
+    
+    // Cardio / Warmup
+    if (name.includes('warmup') || name.includes('warm-up') || name.includes('aufwärm') ||
+        name.includes('laufband') || name.includes('treadmill') || name.includes('fahrrad') || 
+        name.includes('bike') || name.includes('rudergerät') || name.includes('stepper') ||
+        name.includes('cardio')) {
+        groups.push('Cardio');
+    }
+    
+    // Fallback
+    if (groups.length === 0) {
+        groups.push('Sonstige');
+    }
+    
+    return groups;
+}
+
+// Holt Muskelgruppen für eine Übung (DB-Wert bevorzugt, Fallback auf Auto-Erkennung)
+function getMuscleGroups(exercise) {
+    // Falls exercise ein String ist, nur Auto-Erkennung
+    if (typeof exercise === 'string') {
+        return detectMuscleGroups(exercise);
+    }
+    
+    // Falls DB-Wert vorhanden, diesen parsen (CSV-String)
+    if (exercise.muscle_groups) {
+        return exercise.muscle_groups.split(',').map(g => g.trim()).filter(g => g);
+    }
+    
+    // Fallback auf Auto-Erkennung
+    return detectMuscleGroups(exercise.name || '');
+}
+
 function showToast(message, type = 'success') {
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
@@ -404,6 +560,49 @@ function getLastSetForExercise(exerciseId, excludeDate = null) {
         });
     
     return exerciseSets[0] || null;
+}
+
+// Superset Helper Functions
+function getSupersetPartners(set) {
+    if (!set.superset_id) return [];
+    return state.sets.filter(s => 
+        s.superset_id === set.superset_id && 
+        s.id !== set.id
+    );
+}
+
+function showSupersetInfo(supersetId) {
+    const sets = state.sets.filter(s => s.superset_id === supersetId);
+    if (sets.length === 0) return;
+    
+    const infoHtml = sets.map(s => {
+        const exercise = state.exercises.find(e => e.id === s.exercise_id);
+        return `<div class="superset-info-item">
+            <span class="exercise-name">${getExerciseIcon(exercise)} ${s.exercise_name}</span>
+            <span class="set-details">${s.weight}kg × ${s.reps} ${getDifficultyEmoji(s.difficulty)}</span>
+        </div>`;
+    }).join('');
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'supersetInfoModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 350px;">
+            <div class="modal-header">
+                <h2>🔗 Supersatz</h2>
+                <button class="close-modal" onclick="closeModal('supersetInfoModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 14px;">
+                    Diese Sätze wurden zusammen als Supersatz ausgeführt:
+                </p>
+                <div class="superset-info-list">
+                    ${infoHtml}
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
 }
 
 function renderExercisesView() {
@@ -767,40 +966,51 @@ function renderWeeklyChart(weeklyData) {
     });
 }
 
-function getMuscleGroup(exerciseName) {
-    const name = exerciseName.toLowerCase();
-    if (name.includes('bank') || name.includes('brust') || name.includes('flieg') || name.includes('butterfly') || name.includes('dip')) return 'Brust';
-    if (name.includes('rücken') || name.includes('lat') || name.includes('ruder') || name.includes('pull') || name.includes('deadlift')) return 'Rücken';
-    if (name.includes('schulter') || name.includes('shoulder') || name.includes('seitheben') || name.includes('front') || name.includes('press')) return 'Schultern';
-    if (name.includes('bizeps') || name.includes('curl')) return 'Bizeps';
-    if (name.includes('trizeps') || name.includes('tricep') || name.includes('drücken')) return 'Trizeps'; // Kabeldrücken etc.
-    if (name.includes('bein') || name.includes('squat') || name.includes('lunge') || name.includes('wade') || name.includes('streck') || name.includes('beug')) return 'Beine';
-    if (name.includes('bauch') || name.includes('crunch') || name.includes('plank')) return 'Bauch';
-    return 'Sonstige';
-}
-
 function renderSplitChart(exercises) {
     const ctx = document.getElementById('splitChart');
     if (!ctx) return;
 
     if (splitChart) splitChart.destroy();
 
-    // Aggregieren nach Muskelgruppe
+    // Aggregieren nach Muskelgruppe (1:n - eine Übung kann mehrere Gruppen haben)
     const groups = {};
     exercises.forEach(e => {
-        const group = getMuscleGroup(e.name);
-        if (!groups[group]) groups[group] = 0;
-        groups[group] += e.volume;
+        // Finde die Übung im State, um muscle_groups aus DB zu holen
+        const exerciseFromState = state.exercises.find(ex => ex.name === e.name);
+        const muscleGroups = getMuscleGroups(exerciseFromState || e.name);
+        
+        // Volumen auf alle Muskelgruppen aufteilen
+        const volumePerGroup = e.volume / muscleGroups.length;
+        muscleGroups.forEach(group => {
+            if (!groups[group]) groups[group] = 0;
+            groups[group] += volumePerGroup;
+        });
     });
 
     const labels = Object.keys(groups);
     const data = Object.values(groups);
     
-    // Farben für Gruppen
-    const colors = [
-        '#3b82f6', '#10b981', '#f59e0b', '#ef4444', 
-        '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'
-    ];
+    // Farben für Gruppen (erweitert für mehr Kategorien)
+    const colorMap = {
+        'Brust': '#3b82f6',
+        'Rücken': '#10b981',
+        'Schultern': '#f59e0b',
+        'Nacken': '#a855f7',
+        'Bizeps': '#ef4444',
+        'Trizeps': '#ec4899',
+        'Unterarme': '#f97316',
+        'Quadrizeps': '#14b8a6',
+        'Beinbeuger': '#06b6d4',
+        'Waden': '#84cc16',
+        'Gesäß': '#d946ef',
+        'Adduktoren': '#8b5cf6',
+        'Abduktoren': '#6366f1',
+        'Bauch': '#eab308',
+        'Unterer Rücken': '#22c55e',
+        'Cardio': '#64748b',
+        'Sonstige': '#94a3b8'
+    };
+    const colors = labels.map(l => colorMap[l] || '#94a3b8');
 
     splitChart = new Chart(ctx, {
         type: 'doughnut',
@@ -1110,20 +1320,29 @@ function openExerciseModal(exerciseId) {
     if (currentSets.length > 0) {
         setsContainer.innerHTML = `
             <h3>${setsTitle}</h3>
-            ${currentSets.map(set => `
-                <div class="set-row" data-set-id="${set.id}">
+            ${currentSets.map(set => {
+                const supersetPartners = getSupersetPartners(set);
+                const hasSupersetPartner = supersetPartners.length > 0;
+                return `
+                <div class="set-row ${hasSupersetPartner ? 'has-superset' : ''}" data-set-id="${set.id}" ${set.superset_id ? `data-superset-id="${set.superset_id}"` : ''}>
                     <span class="set-number">${set.set_number}</span>
                     <div class="set-details">
                         <span class="set-weight">${set.weight} kg</span>
                         <span class="set-reps">${set.reps} Wdh.</span>
                     </div>
                     <span class="set-difficulty">${getDifficultyEmoji(set.difficulty)}</span>
+                    ${hasSupersetPartner ? `
+                        <span class="superset-indicator" title="Supersatz mit: ${supersetPartners.map(p => p.exercise_name).join(', ')}" 
+                              onclick="event.stopPropagation(); showSupersetInfo('${set.superset_id}')">
+                            🔗
+                        </span>
+                    ` : ''}
                     <div class="set-actions">
                         <button class="set-action-btn" onclick="editSet(${set.id})">✏️</button>
                         <button class="set-action-btn delete" onclick="deleteSet(${set.id})">🗑️</button>
                     </div>
                 </div>
-            `).join('')}
+            `}).join('')}
         `;
     } else {
         setsContainer.innerHTML = '';
@@ -1256,6 +1475,7 @@ function showEditExerciseModal(exerciseId) {
     if (!exercise) return;
     
     const currentIcon = exercise.icon || getExerciseIconAuto(exercise.name);
+    const currentMuscleGroups = getMuscleGroups(exercise);
     
     const modal = document.createElement('div');
     modal.className = 'modal';
@@ -1288,6 +1508,28 @@ function showEditExerciseModal(exerciseId) {
                     </div>
                 </div>
                 
+                <div class="form-group">
+                    <label>Muskelgruppen</label>
+                    <div class="muscle-group-selector" id="muscleGroupSelector">
+                        <div class="muscle-group-display" onclick="toggleMuscleGroupDropdown()">
+                            <div class="muscle-group-tags" id="muscleGroupTags">
+                                ${currentMuscleGroups.map(g => `<span class="muscle-tag">${g}</span>`).join('')}
+                            </div>
+                            <span class="dropdown-arrow">▼</span>
+                        </div>
+                        <div class="muscle-group-dropdown" id="muscleGroupDropdown">
+                            ${MUSCLE_GROUPS.map(group => `
+                                <label class="muscle-group-option">
+                                    <input type="checkbox" value="${group}" 
+                                           ${currentMuscleGroups.includes(group) ? 'checked' : ''}
+                                           onchange="updateMuscleGroupTags()">
+                                    <span>${group}</span>
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+                
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
                     <button class="primary-btn full-width" onclick="saveExerciseEdit(${exerciseId})">
                         Speichern
@@ -1301,6 +1543,39 @@ function showEditExerciseModal(exerciseId) {
     `;
     document.body.appendChild(modal);
     document.getElementById('editExerciseName').focus();
+    
+    // Click outside dropdown schließt es
+    document.addEventListener('click', closeMuscleGroupDropdownOnClickOutside);
+}
+
+function toggleMuscleGroupDropdown() {
+    const dropdown = document.getElementById('muscleGroupDropdown');
+    dropdown.classList.toggle('open');
+}
+
+function closeMuscleGroupDropdownOnClickOutside(e) {
+    const selector = document.getElementById('muscleGroupSelector');
+    const dropdown = document.getElementById('muscleGroupDropdown');
+    if (selector && dropdown && !selector.contains(e.target)) {
+        dropdown.classList.remove('open');
+    }
+}
+
+function updateMuscleGroupTags() {
+    const checkboxes = document.querySelectorAll('#muscleGroupDropdown input[type="checkbox"]:checked');
+    const selected = Array.from(checkboxes).map(cb => cb.value);
+    
+    const tagsContainer = document.getElementById('muscleGroupTags');
+    if (selected.length === 0) {
+        tagsContainer.innerHTML = '<span class="muscle-tag empty">Keine ausgewählt</span>';
+    } else {
+        tagsContainer.innerHTML = selected.map(g => `<span class="muscle-tag">${g}</span>`).join('');
+    }
+}
+
+function getSelectedMuscleGroups() {
+    const checkboxes = document.querySelectorAll('#muscleGroupDropdown input[type="checkbox"]:checked');
+    return Array.from(checkboxes).map(cb => cb.value);
 }
 
 function selectExerciseIcon(icon) {
@@ -1316,16 +1591,24 @@ function selectExerciseIcon(icon) {
 async function saveExerciseEdit(exerciseId) {
     const name = document.getElementById('editExerciseName').value.trim();
     const icon = document.getElementById('currentExerciseIcon').textContent;
+    const muscleGroups = getSelectedMuscleGroups();
     
     if (!name) {
         showToast('Name darf nicht leer sein', 'error');
         return;
     }
     
+    // Event Listener aufräumen
+    document.removeEventListener('click', closeMuscleGroupDropdownOnClickOutside);
+    
     try {
         const updated = await api(`exercises/${exerciseId}`, {
             method: 'PUT',
-            body: JSON.stringify({ name, icon })
+            body: JSON.stringify({ 
+                name, 
+                icon,
+                muscle_groups: muscleGroups.join(',')
+            })
         });
         
         // Lokalen State aktualisieren
@@ -1333,6 +1616,7 @@ async function saveExerciseEdit(exerciseId) {
         if (exercise) {
             exercise.name = updated.name;
             exercise.icon = updated.icon;
+            exercise.muscle_groups = updated.muscle_groups;
         }
         
         closeModal('editExerciseModal');

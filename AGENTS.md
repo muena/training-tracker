@@ -99,6 +99,7 @@ http://localhost:8765
 - `id` INTEGER PRIMARY KEY
 - `name` TEXT UNIQUE
 - `icon` TEXT (optional, emoji)
+- `muscle_groups` TEXT (comma-separated, e.g. "Brust,Trizeps")
 - `created_at` DATETIME
 
 **workouts**
@@ -115,6 +116,7 @@ http://localhost:8765
 - `weight` REAL
 - `reps` INTEGER
 - `difficulty` TEXT ('Leicht', 'Mittel', 'Schwer', 'Sehr schwer')
+- `superset_id` TEXT (UUID to link sets in a superset)
 - `created_at` DATETIME
 - `completed_at` DATETIME
 - `duration_seconds` INTEGER (auto-calculated)
@@ -122,6 +124,17 @@ http://localhost:8765
 
 ### Unique Constraints
 - `(workout_id, exercise_id, set_number)` - One set per exercise per workout
+
+### Muscle Groups
+Available values for `muscle_groups`:
+- Brust, Rücken, Schultern, Nacken
+- Bizeps, Trizeps, Unterarme
+- Quadrizeps, Beinbeuger, Waden, Gesäß, Adduktoren, Abduktoren
+- Bauch, Unterer Rücken
+- Cardio, Sonstige
+
+### Supersets
+Sets can be linked via `superset_id` (UUID). All sets with the same `superset_id` were performed together as a superset.
 
 ## REST API Endpoints
 
@@ -138,8 +151,9 @@ http://localhost:8765
 - `POST /api/sets` - Create set `{workoutDate, exerciseId, setNumber, weight, reps, difficulty}`
 
 ### PUT/PATCH Endpoints
-- `PUT /api/exercises/:id` - Update exercise `{name, icon}`
+- `PUT /api/exercises/:id` - Update exercise `{name, icon, muscle_groups}`
 - `PUT /api/sets/:id` - Update set `{weight, reps, difficulty}`
+- `PUT /api/sets/:id/superset` - Link/unlink superset `{superset_id}`
 
 ### DELETE Endpoints
 - `DELETE /api/exercises/:id` - Delete exercise (and all linked sets)
