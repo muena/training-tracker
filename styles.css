@@ -23,7 +23,11 @@
     --text-secondary: #94a3b8;
     --text-muted: #64748b;
     --border: #334155;
+    --border-subtle: rgba(255, 255, 255, 0.08);
     --shadow: rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.4);
+    --glass-bg: rgba(22, 33, 62, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.1);
 }
 
 html, body {
@@ -43,7 +47,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
-    max-width: 1200px;
+    max-width: 1600px;
     margin: 0 auto;
     background: var(--bg-dark);
 }
@@ -53,18 +57,23 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
-    background: var(--bg-card);
-    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--glass-border);
     position: sticky;
     top: 0;
     z-index: 100;
 }
 
 .header h1 {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--text-primary);
+    font-size: 22px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .icon-btn {
@@ -84,9 +93,11 @@ body {
 /* Tabs */
 .tabs {
     display: flex;
-    background: var(--bg-card);
-    border-bottom: 1px solid var(--border);
-    padding: 0 10px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--glass-border);
+    padding: 0 16px;
 }
 
 .tab {
@@ -94,7 +105,7 @@ body {
     background: none;
     border: none;
     color: var(--text-secondary);
-    padding: 14px 10px;
+    padding: 16px 12px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
@@ -103,7 +114,7 @@ body {
 }
 
 .tab.active {
-    color: var(--primary);
+    color: var(--primary-light);
 }
 
 .tab.active::after {
@@ -113,7 +124,7 @@ body {
     left: 10%;
     right: 10%;
     height: 3px;
-    background: var(--primary);
+    background: linear-gradient(90deg, var(--primary), var(--primary-light));
     border-radius: 3px 3px 0 0;
 }
 
@@ -198,15 +209,16 @@ body {
 }
 
 .primary-btn {
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
     border: none;
-    padding: 12px 20px;
-    border-radius: 10px;
+    padding: 14px 24px;
+    border-radius: 12px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .primary-btn:active {
@@ -214,7 +226,8 @@ body {
 }
 
 .primary-btn:hover {
-    background: var(--primary-dark);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    transform: translateY(-1px);
 }
 
 .primary-btn.full-width {
@@ -231,10 +244,16 @@ body {
 .exercise-card {
     background: var(--bg-card);
     border-radius: 16px;
-    padding: 16px;
+    padding: 18px;
     cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    border: 1px solid var(--border);
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.exercise-card:hover {
+    border-color: var(--glass-border);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .exercise-card:active {
@@ -479,9 +498,10 @@ body {
 .stats-card {
     background: var(--bg-card);
     border-radius: 16px;
-    padding: 20px;
+    padding: 24px;
     margin-bottom: 16px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .stats-card h3 {
@@ -739,6 +759,9 @@ body {
     border-radius: 24px 24px 0 0;
     overflow: hidden;
     animation: slideUp 0.3s ease;
+    border: 1px solid var(--glass-border);
+    border-bottom: none;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
 }
 
 @keyframes slideUp {
@@ -990,9 +1013,10 @@ body {
 
 /* Quick Add Set */
 .quick-add-set {
-    background: var(--bg-input);
+    background: rgba(15, 52, 96, 0.6);
     border-radius: 16px;
     padding: 20px;
+    border: 1px solid var(--border-subtle);
 }
 
 .quick-add-set h3 {
@@ -1512,8 +1536,12 @@ body {
     .all-exercises-list {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-        gap: 16px;
+        gap: 20px;
         align-content: flex-start;
+    }
+
+    .view {
+        padding: 24px 32px;
     }
 
     /* Modal - Center on Desktop */
@@ -1526,7 +1554,8 @@ body {
         max-width: 600px;
         border-radius: 24px; /* All corners rounded */
         max-height: 85vh;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--glass-border);
     }
 
     /* Charts - Give more space */
@@ -1536,6 +1565,23 @@ body {
 
     .stats-grid {
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+}
+
+/* Large Desktop */
+@media (min-width: 1200px) {
+    .exercise-list, 
+    .all-exercises-list {
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 24px;
+    }
+
+    .view {
+        padding: 32px 48px;
+    }
+
+    .stats-card {
+        padding: 28px;
     }
 }
 
@@ -1575,13 +1621,14 @@ body {
     align-items: center;
     padding: 14px 16px;
     background: var(--bg-card);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle);
     border-radius: 12px;
     color: var(--text-primary);
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.2s, border-color 0.2s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .goals-toggle:hover {
@@ -1599,12 +1646,13 @@ body {
 
 .goals-content {
     background: var(--bg-card);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle);
     border-top: none;
     border-radius: 0 0 12px 12px;
     padding: 16px;
     margin-top: -12px;
     padding-top: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .goals-form {
@@ -1641,10 +1689,11 @@ body {
     display: flex;
     flex-direction: column;
     background: var(--bg-card);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle);
     border-radius: 16px;
     overflow: hidden;
     min-height: 0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .chat-header {
@@ -1741,9 +1790,10 @@ body {
 
 .chat-message.user {
     align-self: flex-end;
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
     border-bottom-right-radius: 4px;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .chat-message.assistant {
@@ -1844,15 +1894,16 @@ body {
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     border: none;
     color: white;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.2s, opacity 0.2s;
+    transition: all 0.2s;
     flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 #sendChatBtn:disabled {
