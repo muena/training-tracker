@@ -89,7 +89,83 @@
 
             <!-- Coach View -->
             <section id="coachView" class="view">
-                <!-- ... coach content ... -->
+                <div class="coach-container">
+                    <!-- Goals Section (collapsible) -->
+                    <div class="coach-goals-section">
+                        <button class="goals-toggle" onclick="toggleGoalsSection()">
+                            <span>🎯 Meine Fitnessziele</span>
+                            <span class="toggle-icon">▼</span>
+                        </button>
+                        <div id="goalsContent" class="goals-content" style="display: none;">
+                            <div class="goals-form">
+                                <div class="input-group">
+                                    <label>Deine Ziele</label>
+                                    <textarea id="userGoals" placeholder="z.B. Muskelaufbau, Kraft steigern, Abnehmen..."></textarea>
+                                </div>
+                                <div class="input-group">
+                                    <label>Erfahrungslevel</label>
+                                    <select id="experienceLevel">
+                                        <option value="">Bitte wählen...</option>
+                                        <option value="beginner">Anfänger (< 1 Jahr)</option>
+                                        <option value="intermediate">Fortgeschritten (1-3 Jahre)</option>
+                                        <option value="advanced">Erfahren (3+ Jahre)</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>Trainingsfrequenz</label>
+                                    <select id="trainingFrequency">
+                                        <option value="">Bitte wählen...</option>
+                                        <option value="1-2">1-2x pro Woche</option>
+                                        <option value="3-4">3-4x pro Woche</option>
+                                        <option value="5+">5+ pro Woche</option>
+                                    </select>
+                                </div>
+                                <button class="primary-btn" onclick="saveGoals()">Ziele speichern</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Section -->
+                    <div class="coach-chat-section">
+                        <div class="chat-header">
+                            <div class="chat-title">
+                                <span id="chatTitle">💬 Neuer Chat</span>
+                            </div>
+                            <div class="chat-actions">
+                                <button class="icon-btn" onclick="showConversationHistory()" title="Verlauf">📋</button>
+                                <button class="icon-btn" onclick="startNewConversation()" title="Neuer Chat">➕</button>
+                            </div>
+                        </div>
+                        
+                        <div id="chatMessages" class="chat-messages">
+                            <div class="chat-welcome">
+                                <div class="coach-avatar">🏋️</div>
+                                <h3>Hallo! Ich bin dein TrainBot.</h3>
+                                <p>Ich kann dir helfen mit:</p>
+                                <ul>
+                                    <li>📋 Trainingspläne erstellen</li>
+                                    <li>📊 Fortschritt analysieren</li>
+                                    <li>💡 Trainingsempfehlungen</li>
+                                    <li>❓ Fragen beantworten</li>
+                                </ul>
+                                <div class="quick-prompts">
+                                    <button onclick="sendQuickPrompt('Erstelle mir einen Trainingsplan für diese Woche')">📋 Trainingsplan erstellen</button>
+                                    <button onclick="sendQuickPrompt('Analysiere meinen Fortschritt der letzten Wochen')">📊 Fortschritt analysieren</button>
+                                    <button onclick="sendQuickPrompt('Was sollte ich heute trainieren?')">💪 Workout-Empfehlung</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chat-input-section">
+                            <div class="chat-input-container">
+                                <textarea id="chatInput" placeholder="Frag deinen Coach..." rows="1" onkeydown="handleChatKeydown(event)"></textarea>
+                                <button id="sendChatBtn" onclick="sendChatMessage()" disabled>
+                                    <span class="send-icon">➤</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- Settings View -->
