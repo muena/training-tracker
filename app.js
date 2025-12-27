@@ -519,6 +519,9 @@ function renderWorkoutView() {
     // Render Warmups zuerst
     renderWarmupSection();
     
+    // Workout-Dauer anzeigen
+    renderWorkoutDuration();
+    
     // Gruppiere Sätze nach Übung für den aktuellen Tag
     const currentSets = state.sets.filter(s => s.workout_date === state.currentDate);
     const exercisesWithSets = new Map();
@@ -688,6 +691,76 @@ function formatDistance(meters) {
         return `${(meters / 1000).toFixed(1)} km`;
     }
     return `${meters} m`;
+}
+
+// Formatiert Set-Pausenzeit kompakt (z.B. "90s", "1:30", "2:15")
+function formatRestTime(seconds) {
+    if (!seconds || seconds <= 0) return null;
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (secs === 0) return `${mins}:00`;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Berechnet Gesamtdauer eines Workouts (Warmups + Sets)
+function calculateWorkoutDuration(workoutDate) {
+    const currentWarmups = state.warmups.filter(w => w.workout_date === workoutDate);
+    const currentSets = state.sets.filter(s => s.workout_date === workoutDate);
+    
+    // Warmup-Dauer (die tatsächliche Aktivitätszeit)
+    const warmupDuration = currentWarmups.reduce((sum, w) => sum + (w.duration_seconds || 0), 0);
+    
+    // Set-Dauer (Pausenzeiten zwischen Sets)
+    const setsDuration = currentSets.reduce((sum, s) => sum + (s.duration_cleaned || s.duration_seconds || 0), 0);
+    
+    return warmupDuration + setsDuration;
+}
+
+// Zeigt die Workout-Dauer im Header an
+function renderWorkoutDuration() {
+    const totalSeconds = calculateWorkoutDuration(state.currentDate);
+    
+    // Prüfen ob es Sätze oder Warmups gibt
+    const hasSets = state.sets.some(s => s.workout_date === state.currentDate);
+    const hasWarmups = state.warmups.some(w => w.workout_date === state.currentDate);
+    
+    // Dauer-Element erstellen oder aktualisieren
+    let durationEl = document.getElementById('workoutDuration');
+    
+    if (!hasSets && !hasWarmups) {
+        // Kein Workout - Element entfernen falls vorhanden
+        if (durationEl) durationEl.remove();
+        return;
+    }
+    
+    if (!durationEl) {
+        durationEl = document.createElement('div');
+        durationEl.id = 'workoutDuration';
+        durationEl.className = 'workout-duration';
+        const workoutHeader = document.querySelector('.workout-header');
+        if (workoutHeader) {
+            workoutHeader.appendChild(durationEl);
+        }
+    }
+    
+    // Formatiere Dauer (Minuten oder Stunden:Minuten)
+    if (totalSeconds > 0) {
+        const hours = Math.floor(totalSeconds / 3600);
+        const mins = Math.floor((totalSeconds % 3600) / 60);
+        
+        let durationText;
+        if (hours > 0) {
+            durationText = `${hours}h ${mins}min`;
+        } else {
+            durationText = `${mins} min`;
+        }
+        
+        durationEl.innerHTML = `<span class="duration-icon">⏱️</span><span class="duration-text">${durationText}</span>`;
+        durationEl.style.display = 'flex';
+    } else {
+        durationEl.style.display = 'none';
+    }
 }
 
 function showAddWarmupModal() {
@@ -1839,6 +1912,7 @@ function openExerciseModal(exerciseId) {
             ${currentSets.map(set => {
                 const supersetPartners = getSupersetPartners(set);
                 const hasSupersetPartner = supersetPartners.length > 0;
+                const restTime = formatRestTime(set.duration_cleaned || set.duration_seconds);
                 return `
                 <div class="set-row ${hasSupersetPartner ? 'has-superset' : ''}" data-set-id="${set.id}" ${set.superset_id ? `data-superset-id="${set.superset_id}"` : ''}>
                     <span class="set-number">${set.set_number}</span>
@@ -1847,6 +1921,7 @@ function openExerciseModal(exerciseId) {
                         <span class="set-reps">${set.reps} Wdh.</span>
                     </div>
                     <span class="set-difficulty">${getDifficultyEmoji(set.difficulty)}</span>
+                    ${restTime ? `<span class="set-rest-time" title="Pausenzeit">⏱️${restTime}</span>` : ''}
                     ${hasSupersetPartner ? `
                         <span class="superset-indicator" title="Supersatz mit: ${supersetPartners.map(p => p.exercise_name).join(', ')}" 
                               onclick="event.stopPropagation(); showSupersetInfo('${set.superset_id}')">
