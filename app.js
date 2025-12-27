@@ -22,6 +22,16 @@ const state = {
         currentConversationId: null,
         messages: [],
         isLoading: false
+    },
+    // Settings & Timer State
+    settings: {
+        restTimerEnabled: true,
+        defaultRestTime: 90
+    },
+    timer: {
+        remaining: 0,
+        interval: null,
+        isActive: false
     }
 };
 
@@ -98,15 +108,161 @@ function formatDateFullCompact(dateString) {
 function getDifficultyEmoji(difficulty) {
     const map = {
         'Leicht': '🟢',
-        'leicht': '🟢',
         'Mittel': '🟡',
-        'mittel': '🟡',
         'Schwer': '🟠',
-        'schwer': '🟠',
-        'Sehr schwer': '🔴',
-        'sehr schwer': '🔴'
+        'Sehr schwer': '🔴'
     };
     return map[difficulty] || '🟡';
+}
+
+// ============================================
+// Rest Timer Logic
+// ============================================
+function startRestTimer(seconds) {
+    if (!state.settings.restTimerEnabled) return;
+    
+    // Bestehenden Timer stoppen
+    if (state.timer.interval) {
+        clearInterval(state.timer.interval);
+    }
+    
+    state.timer.remaining = seconds || state.settings.defaultRestTime;
+    state.timer.isActive = true;
+    
+    const overlay = document.getElementById('restTimerOverlay');
+    const display = document.getElementById('timerDisplay');
+    
+    overlay.classList.remove('finished');
+    overlay.style.display = 'block';
+    updateTimerDisplay();
+    
+    state.timer.interval = setInterval(() => {
+        state.timer.remaining--;
+        updateTimerDisplay();
+        
+        if (state.timer.remaining <= 0) {
+            finishRestTimer();
+        }
+    }, 1000);
+}
+
+function updateTimerDisplay() {
+    const display = document.getElementById('timerDisplay');
+    if (!display) return;
+    
+    const mins = Math.floor(Math.abs(state.timer.remaining) / 60);
+    const secs = Math.abs(state.timer.remaining) % 60;
+    const sign = state.timer.remaining < 0 ? '-' : '';
+    display.textContent = `${sign}${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+function adjustTimer(seconds) {
+    state.timer.remaining += seconds;
+    if (state.timer.remaining < 0) state.timer.remaining = 0;
+    updateTimerDisplay();
+}
+
+function finishRestTimer() {
+    const overlay = document.getElementById('restTimerOverlay');
+    overlay.classList.add('finished');
+    
+    // Vibration (falls unterstützt)
+    if ("vibrate" in navigator) {
+        navigator.vibrate([200, 100, 200]);
+    }
+    
+    // Nach 5 Sekunden im Minus stoppen wir den Timer nicht, lassen ihn aber weiterlaufen
+    // damit der User sieht wie viel er überzogen hat.
+}
+
+function stopRestTimer() {
+    if (state.timer.interval) {
+        clearInterval(state.timer.interval);
+        state.timer.interval = null;
+    }
+    state.timer.isActive = false;
+    document.getElementById('restTimerOverlay').style.display = 'none';
+}
+
+// ============================================
+// Data Export
+// ============================================
+function exportDataToCSV() {
+    if (!state.sets || state.sets.length === 0) {
+        showToast('Keine Daten zum Exportieren vorhanden', 'error');
+        return;
+    }
+
+    const headers = ['Datum', 'Übung', 'Satz', 'Gewicht', 'Wiederholungen', 'Schwierigkeit', 'Pausenzeit'];
+    const rows = state.sets.map(s => [
+        s.workout_date,
+        s.exercise_name,
+        s.set_number,
+        s.weight,
+        s.reps,
+        s.difficulty,
+        s.duration_cleaned || s.duration_seconds || ''
+    ]);
+
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(r => r.map(val => `"${val}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `training_data_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast('Export gestartet');
+}
+function loadSettings() {
+    const saved = localStorage.getItem('training_tracker_settings');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            state.settings = { ...state.settings, ...parsed };
+        } catch (e) {
+            console.error('Failed to parse settings', e);
+        }
+    }
+    updateSettingsUI();
+}
+
+function saveSettings() {
+    localStorage.setItem('training_tracker_settings', JSON.stringify(state.settings));
+}
+
+function updateSettingsUI() {
+    const enabledInput = document.getElementById('settingRestTimerEnabled');
+    const timeInput = document.getElementById('settingDefaultRestTime');
+    
+    if (enabledInput) enabledInput.checked = state.settings.restTimerEnabled;
+    if (timeInput) timeInput.value = state.settings.defaultRestTime;
+}
+
+function initSettingsListeners() {
+    const enabledInput = document.getElementById('settingRestTimerEnabled');
+    const timeInput = document.getElementById('settingDefaultRestTime');
+    
+    if (enabledInput) {
+        enabledInput.addEventListener('change', (e) => {
+            state.settings.restTimerEnabled = e.target.checked;
+            saveSettings();
+        });
+    }
+    
+    if (timeInput) {
+        timeInput.addEventListener('change', (e) => {
+            state.settings.defaultRestTime = parseInt(e.target.value) || 90;
+            saveSettings();
+        });
+    }
 }
 
 // Automatische Icon-Erkennung basierend auf dem Namen
@@ -2361,6 +2517,9 @@ async function addSet() {
         // Modal neu rendern
         openExerciseModal(state.currentExercise.id);
         
+        // Timer starten
+        startRestTimer();
+        
         // Liste aktualisieren
         renderWorkoutView();
     } catch (error) {
@@ -2559,6 +2718,8 @@ function switchView(viewName) {
 document.addEventListener('DOMContentLoaded', () => {
     // Initial load
     loadData();
+    loadSettings();
+    initSettingsListeners();
     
     // Tab navigation
     document.querySelectorAll('.tab').forEach(tab => {
