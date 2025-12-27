@@ -1482,20 +1482,23 @@ body::after {
 
 .superset-info-item {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 6px;
     padding: 12px;
     background: var(--bg-input);
     border-radius: 8px;
 }
 
 .superset-info-item .exercise-name {
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 15px;
+    word-break: break-word;
 }
 
 .superset-info-item .set-details {
-    color: var(--text-secondary);
+    color: var(--primary-light);
     font-size: 14px;
+    font-weight: 500;
 }
 
 .last-set-row.has-superset {
@@ -1521,9 +1524,14 @@ body::after {
 
 .superset-link-group-title {
     font-size: 14px;
-    color: var(--text-muted);
-    margin-bottom: 6px;
+    color: var(--text-primary);
+    margin-bottom: 8px;
     font-weight: 600;
+    word-break: break-word;
+    padding: 8px 10px;
+    background: var(--bg-card);
+    border-radius: 6px;
+    border-left: 3px solid var(--primary);
 }
 
 .superset-link-option {
@@ -1539,6 +1547,12 @@ body::after {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+}
+
+.superset-link-option:hover {
+    border-color: var(--primary);
+    background: rgba(59, 130, 246, 0.1);
 }
 
 .superset-link-option:last-child {
