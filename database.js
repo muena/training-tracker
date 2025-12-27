@@ -260,6 +260,10 @@ const updateExerciseStmt = db.prepare(`
     WHERE id = ? AND user_id = ?
 `);
 
+const deleteExerciseStmt = db.prepare(`
+    DELETE FROM exercises WHERE id = ?
+`);
+
 // Workouts
 const getWorkoutsStmt = db.prepare(`
     SELECT id, date, notes, created_at 
