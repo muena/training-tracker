@@ -434,13 +434,10 @@ async function handleApi(req, res, endpoint, user) {
                     return jsonResponse(res, 200, { goals: db.getUserGoals(userId) });
                 
                 case 'coach/conversations':
-                    const { title } = body;
-                    const result = db.createConversation(userId, title);
-                    return jsonResponse(res, 201, result);
-                
+                    return jsonResponse(res, 200, { conversations: db.getConversations(userId) });
+
                 case 'settings':
-                    db.saveUserSettings(userId, body);
-                    return jsonResponse(res, 200, { success: true });
+                    return jsonResponse(res, 200, db.getUserSettings(userId) || {});
 
                 default:
                     if (endpoint.startsWith('coach/conversations/') && endpoint.endsWith('/messages')) {
@@ -671,6 +668,10 @@ async function handleApi(req, res, endpoint, user) {
                         dataChanged: result.dataChanged
                     });
                 }
+
+                case 'settings':
+                    db.saveUserSettings(userId, body);
+                    return jsonResponse(res, 200, { success: true });
 
                 default:
                     return jsonResponse(res, 404, { error: 'Unknown endpoint' });
