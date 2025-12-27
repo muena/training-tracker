@@ -1,5 +1,5 @@
 #!/bin/sh
-# Training Tracker Database Backup Script
+# LIFT Database Backup Script
 # Runs hourly via cron in sidecar container, creates compressed backups with rotation
 
 set -e

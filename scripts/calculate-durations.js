@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Duration Calculator for Training Tracker
+ * Duration Calculator for LIFT
  * 
  * Calculates rest time between sets based on created_at timestamps.
  * Runs periodically as a sidecar container.

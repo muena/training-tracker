@@ -944,7 +944,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
     console.log(`
 ╔══════════════════════════════════════════╗
-║   Training Tracker Server                ║
+║   LIFT Server                            ║
 ╠══════════════════════════════════════════╣
 ║                                          ║
 ║   URL: http://localhost:${PORT}           ║

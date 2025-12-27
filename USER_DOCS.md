@@ -1,6 +1,6 @@
-# Training Tracker - Benutzerhandbuch
+# LIFT - Benutzerhandbuch
 
-Willkommen beim Training Tracker! Diese App hilft dir dabei, dein Krafttraining einfach und effizient zu protokollieren, deinen Fortschritt zu analysieren und deine Ziele zu erreichen.
+Willkommen bei LIFT! Diese App hilft dir dabei, dein Krafttraining einfach und effizient zu protokollieren, deinen Fortschritt zu analysieren und deine Ziele zu erreichen.
 
 ## Inhaltsverzeichnis
 
@@ -118,7 +118,7 @@ Du willst deine Daten in Excel weiterverarbeiten?
 - Klicke auf **"Daten als CSV exportieren"**.
 
 ### App installieren (PWA)
-Du kannst den Training Tracker wie eine normale App auf deinem Smartphone installieren:
+Du kannst LIFT wie eine normale App auf deinem Smartphone installieren:
 - **iOS (Safari):** Tippe auf "Teilen" -> "Zum Home-Bildschirm".
 - **Android (Chrome):** Tippe auf das Menü (drei Punkte) -> "App installieren".
 
