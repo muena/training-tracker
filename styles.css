@@ -311,12 +311,16 @@ input:checked + .slider:before {
     background: none;
     border: none;
     color: var(--text-secondary);
-    padding: 16px 12px;
-    font-size: 14px;
+    padding: 16px 4px; /* Reduced padding from 12px to 4px */
+    font-size: 13px; /* Reduced font size from 14px */
     font-weight: 600;
     cursor: pointer;
     position: relative;
     transition: color 0.2s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
 }
 
 .tab.active {
