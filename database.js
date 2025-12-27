@@ -381,6 +381,7 @@ const getWeightProgressionForExerciseStmt = db.prepare(`
     SELECT 
         w.date as workout_date,
         MAX(s.weight) as max_weight,
+        MAX(s.weight * (1 + s.reps/30.0)) as max_1rm,
         AVG(s.weight) as avg_weight,
         AVG(s.reps) as avg_reps,
         SUM(s.weight * s.reps) as total_volume,
@@ -421,6 +422,7 @@ const getWeeklyStatsStmt = db.prepare(`
 const getExerciseVolumeStatsStmt = db.prepare(`
     SELECT 
         e.name,
+        e.muscle_groups,
         COUNT(s.id) as set_count,
         SUM(s.weight * s.reps) as volume
     FROM sets s
@@ -429,6 +431,19 @@ const getExerciseVolumeStatsStmt = db.prepare(`
     WHERE w.date >= ? AND (w.user_id = ? OR w.user_id IS NULL)
     GROUP BY e.id, e.name
     ORDER BY volume DESC
+`);
+
+const getHeatmapDataStmt = db.prepare(`
+    SELECT 
+        w.date, 
+        COUNT(DISTINCT w.id) as workout_count,
+        COUNT(s.id) as set_count,
+        SUM(s.weight * s.reps) as volume
+    FROM workouts w
+    LEFT JOIN sets s ON w.id = s.workout_id
+    WHERE w.date >= ? AND (w.user_id = ? OR w.user_id IS NULL)
+    GROUP BY w.date
+    ORDER BY w.date ASC
 `);
 
 // Dauer-Berechnung und Ausreißer-Bereinigung
@@ -845,6 +860,31 @@ module.exports = {
             totals: getDetailedStatsStmt.get(start, userId),
             weekly: getWeeklyStatsStmt.all(start, userId),
             exercises: getExerciseVolumeStatsStmt.all(start, userId)
+        };
+    },
+    
+    getHeatmapData: (startDate, userId) => {
+        const start = startDate || '1970-01-01';
+        return getHeatmapDataStmt.all(start, userId);
+    },
+    
+    getDashboardStats: (userId) => {
+        const now = new Date();
+        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10);
+        
+        const currentStats = getDetailedStatsStmt.get(currentMonthStart, userId);
+        const sinceLastMonthStats = getDetailedStatsStmt.get(lastMonthStart, userId);
+        
+        const lastMonthStats = {
+            total_workouts: sinceLastMonthStats.total_workouts - currentStats.total_workouts,
+            total_sets: sinceLastMonthStats.total_sets - currentStats.total_sets,
+            total_volume: (sinceLastMonthStats.total_volume || 0) - (currentStats.total_volume || 0)
+        };
+        
+        return {
+            current: currentStats,
+            previous: lastMonthStats
         };
     },
     

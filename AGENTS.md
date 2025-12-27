@@ -20,7 +20,7 @@ Purpose: Brief the next agent on how to work with this codebase and resume seaml
   - New exercises via search or dedicated button
 - **Update**: Edit any set via edit button in exercise modal
 - **Delete**: Delete button on each set
-- **Statistics**: Overall stats + per-exercise weight/volume progression charts
+- **Statistics**: Advanced Dashboard with KPIs, Activity Heatmap (GitHub-style), Muscle Split Analysis (Sets), and 1RM Progression Charts.
 - **Duration Tracking**: Automatic calculation of rest times between sets with outlier cleaning
 - **Authentication**: Basic Auth (configurable via env vars)
 - **Docker**: Full containerization with docker-compose
@@ -147,7 +147,8 @@ Sets can be linked via `superset_id` (UUID). All sets with the same `superset_id
 - `GET /api/exercises` - All exercises
 - `GET /api/workouts?limit=N` - Last N workouts
 - `GET /api/sets` - All sets with details
-- `GET /api/stats` - Overall + exercise statistics
+- `GET /api/stats` - Overall + exercise statistics (Legacy)
+- `GET /api/stats/dashboard` - Full dashboard data (KPIs, Heatmap, Trends)
 - `GET /api/stats/exercise?id=N` - Weight progression for exercise (includes `has_superset` flag)
 
 ### POST Endpoints

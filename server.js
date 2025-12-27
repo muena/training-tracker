@@ -409,6 +409,16 @@ async function handleApi(req, res, endpoint, user) {
                     const startDate = new URL(req.url, 'http://localhost').searchParams.get('start');
                     return jsonResponse(res, 200, db.getStats(startDate, userId));
                 
+                case 'stats/dashboard':
+                    const dashboardStats = db.getDashboardStats(userId);
+                    const heatmapStart = new Date();
+                    heatmapStart.setFullYear(heatmapStart.getFullYear() - 1);
+                    const heatmapData = db.getHeatmapData(heatmapStart.toISOString().slice(0, 10), userId);
+                    return jsonResponse(res, 200, { 
+                        stats: dashboardStats,
+                        heatmap: heatmapData 
+                    });
+                
                 case 'stats/exercise': {
                     const url = new URL(req.url, 'http://localhost');
                     const exerciseId = parseInt(url.searchParams.get('id'));

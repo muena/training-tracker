@@ -74,16 +74,51 @@
 
             <!-- Stats View -->
             <section id="statsView" class="view">
-                <div id="overallStats">
-                    <!-- Overall stats -->
-                </div>
-                
-                <div id="chartContainer">
-                    <!-- Charts -->
-                </div>
-                
-                <div id="exerciseStatsContainer">
-                    <!-- Exercise-specific stats -->
+                <div class="dashboard-grid">
+                    <!-- KPI Row -->
+                    <div id="kpiGrid" class="kpi-grid">
+                        <!-- Filled by JS -->
+                    </div>
+
+                    <!-- Heatmap Row -->
+                    <div class="dashboard-card">
+                        <h3>Konsistenz</h3>
+                        <div class="heatmap-scroll">
+                            <div id="heatmapContainer" class="heatmap-container">
+                                <!-- Filled by JS -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Charts Row -->
+                    <div class="dashboard-card">
+                        <h3>Muskel-Balance (Sätze)</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="muscleChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card">
+                        <div class="chart-header">
+                            <h3>Fortschritt</h3>
+                            <div class="chart-controls">
+                                <select id="chartExerciseSelect" class="chart-select">
+                                    <option value="">Übung wählen...</option>
+                                </select>
+                                <div class="toggle-wrapper" title="Zeige geschätztes 1 Rep Max">
+                                    <span>Gewicht</span>
+                                    <label class="switch-sm">
+                                        <input type="checkbox" id="show1RMToggle">
+                                        <span class="slider round"></span>
+                                    </label>
+                                    <span>1RM</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="progressChart"></canvas>
+                        </div>
+                    </div>
                 </div>
             </section>
 
