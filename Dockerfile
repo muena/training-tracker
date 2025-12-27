@@ -21,6 +21,7 @@ COPY login.html ./
 COPY app.js ./
 COPY styles.css ./
 COPY manifest.json ./
+COPY logo.svg ./
 COPY scripts ./scripts
 
 # Create data and backup directories

@@ -1382,21 +1382,25 @@ function renderKPIs(stats) {
 
     const container = document.getElementById('kpiGrid');
     if (container) {
+        const workoutDiff = current.total_workouts - previous.total_workouts;
+        const volumeDiff = Math.round(current.total_volume / 1000) - Math.round(previous.total_volume / 1000);
+        const setsDiff = current.total_sets - previous.total_sets;
+        
         container.innerHTML = `
             <div class="kpi-card">
                 <div class="kpi-label">Workouts (Monat)</div>
                 <div class="kpi-value">${current.total_workouts}</div>
-                ${renderTrend(previous.total_workouts)}
+                ${renderTrend(workoutDiff)}
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Volumen (Monat)</div>
                 <div class="kpi-value">${Math.round(current.total_volume / 1000)}t</div>
-                ${renderTrend(Math.round(previous.total_volume / 1000), 't')}
+                ${renderTrend(volumeDiff, 't')}
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Sätze (Monat)</div>
                 <div class="kpi-value">${current.total_sets}</div>
-                ${renderTrend(previous.total_sets)}
+                ${renderTrend(setsDiff)}
             </div>
         `;
     }

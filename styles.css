@@ -2617,6 +2617,22 @@ input:checked + .slider:before {
 .heatmap-day.l3 { background: rgba(59, 130, 246, 0.7); }
 .heatmap-day.l4 { background: rgba(59, 130, 246, 0.9); }
 
+.heatmap-legend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.heatmap-legend-item {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
 /* Chart Controls */
 .chart-header {
     display: flex;
