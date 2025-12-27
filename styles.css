@@ -2581,10 +2581,30 @@ input:checked + .slider:before {
 }
 
 /* Heatmap */
+.heatmap-wrapper {
+    display: flex;
+    gap: 8px;
+}
+
+.heatmap-labels {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--text-muted);
+    padding-top: 0;
+}
+
+.heatmap-labels span {
+    height: 12px;
+    line-height: 12px;
+}
+
 .heatmap-scroll {
     overflow-x: auto;
     padding-bottom: 8px;
     -webkit-overflow-scrolling: touch;
+    flex: 1;
 }
 
 .heatmap-container {

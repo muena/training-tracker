@@ -1422,10 +1422,18 @@ function renderHeatmap(heatmapData) {
     const startDate = new Date(today);
     startDate.setDate(startDate.getDate() - 364);
     
+    // Adjust startDate to the previous Monday (week starts on Monday)
+    const startDayOfWeek = startDate.getDay(); // 0 = Sunday, 1 = Monday, ...
+    const daysToMonday = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+    startDate.setDate(startDate.getDate() - daysToMonday);
+    
+    // Calculate total days from adjusted start to today
+    const totalDays = Math.ceil((today - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    
     let currentWeek = document.createElement('div');
     currentWeek.className = 'heatmap-week';
     
-    for (let i = 0; i < 365; i++) {
+    for (let i = 0; i < totalDays; i++) {
         const date = new Date(startDate);
         date.setDate(date.getDate() + i);
         const dateStr = date.toISOString().split('T')[0];
@@ -1447,11 +1455,17 @@ function renderHeatmap(heatmapData) {
         
         currentWeek.appendChild(day);
         
-        if (currentWeek.children.length === 7 || i === 364) {
+        // Start new week after Sunday (7 days per week, starting Monday)
+        if (currentWeek.children.length === 7) {
             container.appendChild(currentWeek);
             currentWeek = document.createElement('div');
             currentWeek.className = 'heatmap-week';
         }
+    }
+    
+    // Append remaining days of current week
+    if (currentWeek.children.length > 0) {
+        container.appendChild(currentWeek);
     }
 }
 
