@@ -235,15 +235,14 @@ async function migrate() {
 
     // 8. Statistiken anzeigen
     console.log('8. Import-Statistiken:');
-    const stats = db.getOverallStats();
+    const statsObj = db.getStats(null, null); // start=null for all time, userId=null for all users (if applicable, though migration usually is single context or we should assume null context)
+    const stats = statsObj.totals;
+    
     console.log(`   - Workouts: ${stats.total_workouts}`);
-    console.log(`   - Übungen: ${stats.total_exercises}`);
+    console.log(`   - Übungen: ${stats.active_exercises}`);
     console.log(`   - Sätze: ${stats.total_sets}`);
     console.log(`   - Gesamtvolumen: ${Math.round(stats.total_volume || 0)} kg`);
-    if (stats.avg_rest_time) {
-        console.log(`   - Durchschn. Pausenzeit: ${Math.round(stats.avg_rest_time)} Sekunden`);
-    }
-
+    
     console.log('\n=== Migration abgeschlossen! ===\n');
     console.log('Die Datenbank wurde erstellt unter: data/training.db');
     console.log('Du kannst nun den Server starten mit: node server.js\n');
