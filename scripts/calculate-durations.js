@@ -219,11 +219,52 @@ function cleanOutliersForExercise(db, workoutId, exerciseId) {
     return { outliers };
 }
 
+function deleteEmptyWorkouts() {
+    let db;
+    try {
+        db = new Database(DB_PATH, { readonly: false });
+        db.pragma('journal_mode = WAL');
+        
+        // Find workouts with no sets
+        const emptyWorkouts = db.prepare(`
+            SELECT w.id, w.date, w.user_id
+            FROM workouts w
+            LEFT JOIN sets s ON w.id = s.workout_id
+            WHERE s.id IS NULL
+        `).all();
+        
+        if (emptyWorkouts.length === 0) {
+            db.close();
+            return;
+        }
+        
+        console.log(`[${new Date().toISOString()}] Found ${emptyWorkouts.length} empty workouts, deleting...`);
+        
+        const deleteStmt = db.prepare(`DELETE FROM workouts WHERE id = ?`);
+        
+        for (const workout of emptyWorkouts) {
+            deleteStmt.run(workout.id);
+            console.log(`  Deleted empty workout: ${workout.date} (ID: ${workout.id})`);
+        }
+        
+        console.log(`[${new Date().toISOString()}] Deleted ${emptyWorkouts.length} empty workouts`);
+        
+        db.close();
+    } catch (error) {
+        console.error(`[${new Date().toISOString()}] Error deleting empty workouts:`, error.message);
+        if (db) db.close();
+    }
+}
+
 // Initial run
 calculateDurations();
+deleteEmptyWorkouts();
 
 // Schedule periodic runs
-setInterval(calculateDurations, INTERVAL_MINUTES * 60 * 1000);
+setInterval(() => {
+    calculateDurations();
+    deleteEmptyWorkouts();
+}, INTERVAL_MINUTES * 60 * 1000);
 
 console.log(`Duration Calculator running. Next calculation in ${INTERVAL_MINUTES} minutes.`);
 
