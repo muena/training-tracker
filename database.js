@@ -507,6 +507,22 @@ function cleanDurationOutliers(workout_id) {
     }
 }
 
+const bumpSetNumbersForWorkoutExerciseStmt = db.prepare(`
+    UPDATE sets SET set_number = set_number + ? WHERE workout_id = ? AND exercise_id = ?
+`);
+
+const getSetIdsForWorkoutExerciseStmt = db.prepare(`
+    SELECT id FROM sets WHERE workout_id = ? AND exercise_id = ? ORDER BY set_number
+`);
+
+const updateSetNumberByIdStmt = db.prepare(`
+    UPDATE sets SET set_number = ? WHERE id = ?
+`);
+
+const updateSupersetIdForAllSetsStmt = db.prepare(`
+    UPDATE sets SET superset_id = ? WHERE superset_id = ?
+`);
+
 const RENUMBER_SET_OFFSET = 1000000;
 
 function renumberSetsForWorkoutExercise(workoutId, exerciseId) {
