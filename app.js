@@ -221,21 +221,28 @@ function exportDataToCSV() {
     
     showToast('Export gestartet');
 }
-function loadSettings() {
-    const saved = localStorage.getItem('training_tracker_settings');
-    if (saved) {
-        try {
-            const parsed = JSON.parse(saved);
-            state.settings = { ...state.settings, ...parsed };
-        } catch (e) {
-            console.error('Failed to parse settings', e);
+async function loadSettings() {
+    try {
+        const settings = await api('settings');
+        if (settings && Object.keys(settings).length > 0) {
+            state.settings = { ...state.settings, ...settings };
         }
+        updateSettingsUI();
+    } catch (e) {
+        console.error('Failed to load settings from server', e);
     }
-    updateSettingsUI();
 }
 
-function saveSettings() {
-    localStorage.setItem('training_tracker_settings', JSON.stringify(state.settings));
+async function saveSettings() {
+    try {
+        await api('settings', {
+            method: 'POST',
+            body: JSON.stringify(state.settings)
+        });
+    } catch (e) {
+        console.error('Failed to save settings to server', e);
+        showToast('Fehler beim Speichern der Einstellungen', 'error');
+    }
 }
 
 function updateSettingsUI() {

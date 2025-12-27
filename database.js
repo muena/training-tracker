@@ -171,6 +171,15 @@ db.exec(`
 
     CREATE INDEX IF NOT EXISTS idx_coach_messages_conversation ON coach_messages(conversation_id);
     CREATE INDEX IF NOT EXISTS idx_coach_conversations_user ON coach_conversations(user_id);
+
+    CREATE TABLE IF NOT EXISTS user_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        settings_json TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(user_id)
+    );
 `);
 
 // Warmups Tabelle
@@ -561,6 +570,18 @@ function checkUserOwnership(workoutId, userId) {
 }
 
 // Coach Prepared Statements
+const getUserSettingsStmt = db.prepare(`
+    SELECT settings_json FROM user_settings WHERE user_id = ?
+`);
+
+const upsertUserSettingsStmt = db.prepare(`
+    INSERT INTO user_settings (user_id, settings_json, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET
+        settings_json = excluded.settings_json,
+        updated_at = datetime('now')
+`);
+
 const getUserGoalsStmt = db.prepare(`
     SELECT * FROM user_goals WHERE user_id = ?
 `);
@@ -815,6 +836,15 @@ module.exports = {
     saveUserGoals: (userId, goals, experienceLevel, trainingFrequency) => {
         upsertUserGoalsStmt.run(userId, goals, experienceLevel, trainingFrequency);
         return getUserGoalsStmt.get(userId);
+    },
+    
+    getUserSettings: (userId) => {
+        const row = getUserSettingsStmt.get(userId);
+        return row ? JSON.parse(row.settings_json) : null;
+    },
+    saveUserSettings: (userId, settings) => {
+        upsertUserSettingsStmt.run(userId, JSON.stringify(settings));
+        return settings;
     },
     
     getConversations: (userId) => getConversationsStmt.all(userId),

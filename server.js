@@ -434,7 +434,13 @@ async function handleApi(req, res, endpoint, user) {
                     return jsonResponse(res, 200, { goals: db.getUserGoals(userId) });
                 
                 case 'coach/conversations':
-                    return jsonResponse(res, 200, { conversations: db.getConversations(userId) });
+                    const { title } = body;
+                    const result = db.createConversation(userId, title);
+                    return jsonResponse(res, 201, result);
+                
+                case 'settings':
+                    db.saveUserSettings(userId, body);
+                    return jsonResponse(res, 200, { success: true });
 
                 default:
                     if (endpoint.startsWith('coach/conversations/') && endpoint.endsWith('/messages')) {
