@@ -1262,11 +1262,22 @@ function renderStats() {
     `;
 
     // 2. KPIs
+    // Berechne Gesamtzeit aus allen Sätzen im Zeitraum (falls verfügbar)
+    const totalSeconds = state.sets
+        .filter(s => s.workout_date >= getStatsStartDate(state.statsPeriod))
+        .reduce((sum, s) => sum + (s.duration_cleaned || s.duration_seconds || 0), 0);
+    
+    const totalHours = Math.round(totalSeconds / 3600);
+
     const kpiHtml = `
         <div class="stats-grid">
             <div class="stat-item">
                 <div class="stat-value">${totals?.total_workouts || 0}</div>
                 <div class="stat-label">Workouts</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${totalHours}h</div>
+                <div class="stat-label">Zeit gesamt</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value">${Math.round((totals?.total_volume || 0) / 1000)}t</div>
@@ -1275,10 +1286,6 @@ function renderStats() {
             <div class="stat-item">
                 <div class="stat-value">${totals?.total_sets || 0}</div>
                 <div class="stat-label">Sätze</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">${totals?.active_exercises || 0}</div>
-                <div class="stat-label">Übungen</div>
             </div>
         </div>
     `;

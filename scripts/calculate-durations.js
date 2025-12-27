@@ -112,31 +112,30 @@ function calculateDurations() {
                 }
             }
             
-            // Estimate duration for last set of workout (no successor)
-            // Use median of all other sets in this workout
-            const lastSet = sets[sets.length - 1];
-            if (lastSet) {
-                const existingDuration = db.prepare(
-                    `SELECT duration_seconds FROM sets WHERE id = ?`
-                ).get(lastSet.id);
-                
-                if (!existingDuration?.duration_seconds) {
-                    // Get all durations from other sets in this workout
-                    const otherDurations = db.prepare(`
-                        SELECT duration_seconds FROM sets 
-                        WHERE workout_id = ? AND id != ? AND duration_seconds IS NOT NULL
-                        ORDER BY duration_seconds ASC
-                    `).all(workout.id, lastSet.id).map(d => d.duration_seconds);
-                    
-                    if (otherDurations.length > 0) {
-                        // Calculate median
-                        const medianIndex = Math.floor(otherDurations.length / 2);
-                        const estimatedDuration = otherDurations.length % 2 === 0
-                            ? Math.round((otherDurations[medianIndex - 1] + otherDurations[medianIndex]) / 2)
-                            : otherDurations[medianIndex];
-                        
+            // Estimate duration for sets that are still NULL (usually first and last sets)
+            const nullDurationSets = db.prepare(`
+                SELECT id FROM sets 
+                WHERE workout_id = ? AND duration_seconds IS NULL
+            `).all(workout.id);
+
+            if (nullDurationSets.length > 0) {
+                // Get all existing durations from other sets in this workout for median calculation
+                const otherDurations = db.prepare(`
+                    SELECT duration_seconds FROM sets 
+                    WHERE workout_id = ? AND duration_seconds IS NOT NULL
+                    ORDER BY duration_seconds ASC
+                `).all(workout.id).map(d => d.duration_seconds);
+
+                if (otherDurations.length > 0) {
+                    // Calculate median
+                    const medianIndex = Math.floor(otherDurations.length / 2);
+                    const estimatedDuration = otherDurations.length % 2 === 0
+                        ? Math.round((otherDurations[medianIndex - 1] + otherDurations[medianIndex]) / 2)
+                        : otherDurations[medianIndex];
+
+                    for (const s of nullDurationSets) {
                         db.prepare(`UPDATE sets SET duration_seconds = ? WHERE id = ?`)
-                            .run(estimatedDuration, lastSet.id);
+                            .run(estimatedDuration, s.id);
                         setsUpdated++;
                     }
                 }
