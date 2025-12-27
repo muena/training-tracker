@@ -1,6 +1,6 @@
 {
-  "name": "Training Tracker",
-  "short_name": "Tracker",
+  "name": "LIFT",
+  "short_name": "LIFT",
   "description": "Krafttraining Sätze tracken",
   "start_url": "/",
   "display": "standalone",

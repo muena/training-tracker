@@ -97,7 +97,7 @@ async function fetchExerciseName(exerciseId) {
 
 // Migration durchführen
 async function migrate() {
-    console.log('\n=== Training Tracker Migration ===\n');
+    console.log('\n=== LIFT Migration ===\n');
     console.log('Lade Daten aus der alten Datenquelle...\n');
 
     // 1. Alle Seiten laden

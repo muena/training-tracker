@@ -6,14 +6,14 @@ Purpose: Brief the next agent on how to work with this codebase and resume seaml
 
 ## Project Overview
 
-- Goal: Mobile-first Web UI to view, add, edit, and delete strength training sets
+- Goal: Responsive Web UI to view, add, edit, and delete strength training sets
 - Database: SQLite (local, fast, no external dependencies)
 - View: Exercise cards showing last weights + today's sets, easy set entry
 - Current state: **Fully functional CRUD app** with authentication, Docker support, and statistics
 
 ## Features Implemented
 
-- **View**: Mobile-first exercise cards with last weights and today's sets
+- **View**: Responsive exercise cards with last weights and today's sets
 - **Create**: 
   - New workouts via header button
   - New sets via exercise modal (tap card -> add set)
@@ -65,7 +65,7 @@ http://localhost:8765
 ## Files
 
 ### Core Application
-- `index.html` - Mobile-first HTML structure with tabs and modals
+- `index.html` - Responsive HTML structure with tabs and modals
 - `styles.css` - Dark theme, mobile-optimized CSS
 - `app.js` - Frontend logic: state management, API calls, rendering
 - `server.js` - HTTP server with REST API endpoints
@@ -170,7 +170,7 @@ Sets can be linked via `superset_id` (UUID). All sets with the same `superset_id
 ### UI Components
 - **Superset Linking:** Grouped list of today's sets by exercise
 - **Responsive Design:**
-  - **Mobile:** Mobile-first vertical layout
+  - **Mobile:** Responsive vertical layout
   - **Desktop/Tablet (>768px):** Grid layout for exercises, centered modals, max-width 1200px
   - **Landscape Mobile:** Optimized modal height
 
@@ -207,7 +207,7 @@ This handles cases where users take long breaks (conversations, phone calls) by 
 
 ## UI/UX Design
 
-### Mobile-First Principles
+### Mobile Design Principles
 - Touch-friendly buttons (min 44px)
 - Bottom sheet modals (slide up)
 - Dark theme for gym environments

@@ -1,5 +1,5 @@
 /**
- * Training Tracker - Mobile-First App
+ * LIFT - Application Logic
  */
 
 // ============================================

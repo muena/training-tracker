@@ -1,7 +1,7 @@
 {
-  "name": "training-tracker",
+  "name": "lift",
   "version": "2.0.0",
-  "description": "Mobile-first strength training tracker with SQLite",
+  "description": "Modern strength training tracker 'LIFT' with SQLite",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
