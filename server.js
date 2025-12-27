@@ -85,8 +85,141 @@ function parseBody(req) {
     });
 }
 
-// OpenAI Coach Integration
-async function callOpenAI(userMessage, previousMessages, goals, workoutSummary, exerciseProgress, userName) {
+// OpenAI Coach Integration with Function Calling
+const coachTools = [
+    {
+        type: 'function',
+        function: {
+            name: 'create_exercise',
+            description: 'Erstellt eine neue Übung in der Datenbank des Users. Nutze diese Funktion, wenn der User eine neue Übung hinzufügen möchte.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    name: {
+                        type: 'string',
+                        description: 'Der Name der neuen Übung (z.B. "Bankdrücken", "Kniebeugen", "Bizeps Curls")'
+                    },
+                    icon: {
+                        type: 'string',
+                        description: 'Optional: Ein Emoji als Icon für die Übung (z.B. "💪", "🏋️", "🦵")'
+                    },
+                    muscle_groups: {
+                        type: 'string',
+                        description: 'Optional: Komma-separierte Muskelgruppen (z.B. "Brust,Trizeps" oder "Rücken,Bizeps"). Verfügbare Gruppen: Brust, Rücken, Schultern, Nacken, Bizeps, Trizeps, Unterarme, Quadrizeps, Beinbeuger, Waden, Gesäß, Adduktoren, Abduktoren, Bauch, Unterer Rücken, Cardio, Sonstige'
+                    }
+                },
+                required: ['name']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'rename_exercise',
+            description: 'Benennt eine bestehende Übung um. Nutze diese Funktion, wenn der User den Namen einer Übung ändern möchte.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    old_name: {
+                        type: 'string',
+                        description: 'Der aktuelle Name der Übung, die umbenannt werden soll'
+                    },
+                    new_name: {
+                        type: 'string',
+                        description: 'Der neue Name für die Übung'
+                    }
+                },
+                required: ['old_name', 'new_name']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'update_exercise',
+            description: 'Aktualisiert die Details einer bestehenden Übung (Icon, Muskelgruppen). Nutze diese Funktion, wenn der User das Icon oder die Muskelgruppen einer Übung ändern möchte.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    name: {
+                        type: 'string',
+                        description: 'Der Name der Übung, die aktualisiert werden soll'
+                    },
+                    icon: {
+                        type: 'string',
+                        description: 'Optional: Neues Emoji als Icon für die Übung'
+                    },
+                    muscle_groups: {
+                        type: 'string',
+                        description: 'Optional: Neue komma-separierte Muskelgruppen'
+                    }
+                },
+                required: ['name']
+            }
+        }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'list_exercises',
+            description: 'Listet alle verfügbaren Übungen des Users auf. Nutze diese Funktion, wenn der User wissen möchte, welche Übungen er hat, oder um vor einer Umbenennung zu prüfen, ob eine Übung existiert.',
+            parameters: {
+                type: 'object',
+                properties: {},
+                required: []
+            }
+        }
+    }
+];
+
+async function executeCoachFunction(functionName, args, userId) {
+    switch (functionName) {
+        case 'create_exercise': {
+            const exercise = db.createExercise(args.name, userId);
+            if (args.icon || args.muscle_groups) {
+                db.updateExercise(exercise.id, args.name, args.icon, args.muscle_groups, userId);
+            }
+            return { success: true, message: `Übung "${args.name}" wurde erfolgreich erstellt.`, exercise };
+        }
+        
+        case 'rename_exercise': {
+            const exercise = db.getExerciseByName(args.old_name, userId);
+            if (!exercise) {
+                return { success: false, message: `Übung "${args.old_name}" wurde nicht gefunden.` };
+            }
+            db.updateExercise(exercise.id, args.new_name, exercise.icon, exercise.muscle_groups, userId);
+            return { success: true, message: `Übung "${args.old_name}" wurde in "${args.new_name}" umbenannt.` };
+        }
+        
+        case 'update_exercise': {
+            const exercise = db.getExerciseByName(args.name, userId);
+            if (!exercise) {
+                return { success: false, message: `Übung "${args.name}" wurde nicht gefunden.` };
+            }
+            const newIcon = args.icon !== undefined ? args.icon : exercise.icon;
+            const newMuscleGroups = args.muscle_groups !== undefined ? args.muscle_groups : exercise.muscle_groups;
+            db.updateExercise(exercise.id, args.name, newIcon, newMuscleGroups, userId);
+            return { success: true, message: `Übung "${args.name}" wurde aktualisiert.` };
+        }
+        
+        case 'list_exercises': {
+            const exercises = db.getExercises(userId);
+            const exerciseList = exercises.map(e => `- ${e.name}${e.icon ? ` ${e.icon}` : ''}${e.muscle_groups ? ` (${e.muscle_groups})` : ''}`).join('\n');
+            return { 
+                success: true, 
+                message: exercises.length > 0 
+                    ? `Du hast ${exercises.length} Übungen:\n${exerciseList}`
+                    : 'Du hast noch keine Übungen angelegt.',
+                exercises 
+            };
+        }
+        
+        default:
+            return { success: false, message: `Unbekannte Funktion: ${functionName}` };
+    }
+}
+
+async function callOpenAI(userMessage, previousMessages, goals, workoutSummary, exerciseProgress, userName, userId) {
     const systemPrompt = buildCoachSystemPrompt(goals, workoutSummary, exerciseProgress, userName);
     
     // Konvertiere bisherige Nachrichten ins OpenAI-Format
@@ -109,6 +242,8 @@ async function callOpenAI(userMessage, previousMessages, goals, workoutSummary, 
             body: JSON.stringify({
                 model: 'gpt-4o',
                 messages: messages,
+                tools: coachTools,
+                tool_choice: 'auto',
                 max_tokens: 1500,
                 temperature: 0.7
             })
@@ -121,7 +256,57 @@ async function callOpenAI(userMessage, previousMessages, goals, workoutSummary, 
         }
         
         const data = await response.json();
-        return data.choices[0].message.content;
+        const assistantMessage = data.choices[0].message;
+        
+        // Check if the model wants to call a function
+        if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+            // Execute all tool calls
+            const toolResults = [];
+            for (const toolCall of assistantMessage.tool_calls) {
+                const functionName = toolCall.function.name;
+                const args = JSON.parse(toolCall.function.arguments);
+                console.log(`Coach executing function: ${functionName}`, args);
+                
+                const result = await executeCoachFunction(functionName, args, userId);
+                toolResults.push({
+                    tool_call_id: toolCall.id,
+                    role: 'tool',
+                    content: JSON.stringify(result)
+                });
+            }
+            
+            // Send tool results back to get final response
+            const followUpMessages = [
+                ...messages,
+                assistantMessage,
+                ...toolResults
+            ];
+            
+            const followUpResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${OPENAI_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o',
+                    messages: followUpMessages,
+                    max_tokens: 1500,
+                    temperature: 0.7
+                })
+            });
+            
+            if (!followUpResponse.ok) {
+                const error = await followUpResponse.json();
+                console.error('OpenAI Follow-up API Error:', error);
+                throw new Error(error.error?.message || 'OpenAI API Fehler');
+            }
+            
+            const followUpData = await followUpResponse.json();
+            return followUpData.choices[0].message.content;
+        }
+        
+        return assistantMessage.content;
     } catch (error) {
         console.error('OpenAI Call Error:', error);
         throw error;
@@ -156,6 +341,16 @@ DEINE AUFGABEN:
 3. Fortschrittsanalysen durchführen ("Wie entwickelt sich mein Bankdrücken?")
 4. Allgemeine Trainingsfragen beantworten
 5. Motivation und Tipps geben
+6. Übungen verwalten: anlegen, umbenennen, aktualisieren
+
+ÜBUNGSVERWALTUNG:
+Du kannst für den User Übungen erstellen, umbenennen und bearbeiten. Nutze dafür die verfügbaren Funktionen:
+- create_exercise: Neue Übung anlegen (Name, optional Icon und Muskelgruppen)
+- rename_exercise: Bestehende Übung umbenennen
+- update_exercise: Icon oder Muskelgruppen einer Übung ändern
+- list_exercises: Alle Übungen des Users auflisten
+
+Wenn der User eine Übung anlegen oder umbenennen möchte, führe die entsprechende Aktion direkt aus.
 
 WICHTIGE REGELN:
 - Antworte auf Deutsch
@@ -165,6 +360,7 @@ WICHTIGE REGELN:
 - Formatiere Trainingspläne übersichtlich
 - Bei Trainingsplänen: Nutze die Übungen, die der User bereits macht, wo sinnvoll
 - Sei motivierend aber realistisch
+- Bei Übungsanfragen: Führe die Aktion aus und bestätige sie dem User
 
 TRAININGSDATEN DES USERS:
 ${goalsText}
@@ -405,7 +601,8 @@ async function handleApi(req, res, endpoint, user) {
                         goals, 
                         workoutSummary, 
                         exerciseProgress,
-                        user.name
+                        user.name,
+                        userId
                     );
                     
                     // Assistant-Antwort speichern
