@@ -262,6 +262,8 @@ async function callOpenAI(userMessage, previousMessages, goals, workoutSummary, 
         if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
             // Execute all tool calls
             const toolResults = [];
+            let dataChanged = false;
+            
             for (const toolCall of assistantMessage.tool_calls) {
                 const functionName = toolCall.function.name;
                 const args = JSON.parse(toolCall.function.arguments);
@@ -273,6 +275,11 @@ async function callOpenAI(userMessage, previousMessages, goals, workoutSummary, 
                     role: 'tool',
                     content: JSON.stringify(result)
                 });
+                
+                // Mark data as changed if a mutating function was called successfully
+                if (result.success && ['create_exercise', 'rename_exercise', 'update_exercise'].includes(functionName)) {
+                    dataChanged = true;
+                }
             }
             
             // Send tool results back to get final response
@@ -303,10 +310,13 @@ async function callOpenAI(userMessage, previousMessages, goals, workoutSummary, 
             }
             
             const followUpData = await followUpResponse.json();
-            return followUpData.choices[0].message.content;
+            return { 
+                response: followUpData.choices[0].message.content,
+                dataChanged
+            };
         }
         
-        return assistantMessage.content;
+        return { response: assistantMessage.content, dataChanged: false };
     } catch (error) {
         console.error('OpenAI Call Error:', error);
         throw error;
@@ -595,7 +605,7 @@ async function handleApi(req, res, endpoint, user) {
                     const previousMessages = db.getMessages(convId);
                     
                     // OpenAI API aufrufen
-                    const assistantResponse = await callOpenAI(
+                    const result = await callOpenAI(
                         message, 
                         previousMessages, 
                         goals, 
@@ -606,11 +616,12 @@ async function handleApi(req, res, endpoint, user) {
                     );
                     
                     // Assistant-Antwort speichern
-                    db.addMessage(convId, 'assistant', assistantResponse);
+                    db.addMessage(convId, 'assistant', result.response);
                     
                     return jsonResponse(res, 200, { 
                         conversation_id: convId,
-                        response: assistantResponse 
+                        response: result.response,
+                        dataChanged: result.dataChanged
                     });
                 }
 

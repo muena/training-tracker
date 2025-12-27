@@ -2391,6 +2391,12 @@ async function sendChatMessage() {
         // Add assistant response
         addMessageToUI('assistant', result.response);
         
+        // Reload data if coach made changes (e.g., created/renamed exercises)
+        if (result.dataChanged) {
+            console.log('Coach made data changes, reloading...');
+            await loadData();
+        }
+        
     } catch (error) {
         typingIndicator.remove();
         addMessageToUI('assistant', '❌ Fehler: ' + error.message);
