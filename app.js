@@ -599,6 +599,12 @@ async function loadDashboardStats() {
         showLoading(false);
     }
 }
+function showLoading(show) {
+    elements.loading.style.display = show ? 'flex' : 'none';
+}
+
+function showError(message) {
+    elements.error.textContent = message;
     elements.error.style.display = 'block';
     setTimeout(() => elements.error.style.display = 'none', 5000);
 }
@@ -1573,6 +1579,12 @@ async function loadExerciseChart(exerciseId) {
         
     } catch(e) { console.error(e); }
 }
+
+function getWorkoutHistoryForExercise(exerciseId, beforeDate, limit = 5) {
+    const cutoffDate = beforeDate || '9999-12-31';
+    const exerciseSets = state.sets
+        .filter(s => s.exercise_id === exerciseId && s.workout_date < cutoffDate);
+    
     if (exerciseSets.length === 0) return [];
 
     // Gruppiere nach Workout-Datum
