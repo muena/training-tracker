@@ -32,3 +32,17 @@ services:
     depends_on:
       - training-tracker
     restart: unless-stopped
+
+  duration-calculator:
+    build:
+      context: .
+      dockerfile: Dockerfile.duration-calculator
+    container_name: training-tracker-duration
+    environment:
+      - DB_PATH=/data/training.db
+      - CALC_INTERVAL=5
+    volumes:
+      - ./data:/data
+    depends_on:
+      - training-tracker
+    restart: unless-stopped
