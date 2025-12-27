@@ -260,6 +260,9 @@ input:checked + .slider:before {
     50% { transform: scale(1.02); }
     100% { transform: scale(1); }
 }
+
+/* Header */
+.header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -271,6 +274,39 @@ input:checked + .slider:before {
     position: sticky;
     top: 0;
     z-index: 100;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--primary);
+}
+
+.logout-btn {
+    font-size: 16px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .header h1 {

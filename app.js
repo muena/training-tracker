@@ -15,6 +15,7 @@ const state = {
     loading: true,
     statsPeriod: '1m',      // Standard: 1 Monat
     statsData: null,        // Statistik-Daten vom Server
+    user: null,             // User data
     // Coach State
     coach: {
         goals: null,
@@ -185,6 +186,34 @@ function stopRestTimer() {
 }
 
 // ============================================
+// User & Auth
+// ============================================
+function renderUserHeader(user) {
+    const header = document.querySelector('.header');
+    if (!header || document.getElementById('userProfile')) return;
+    
+    const profile = document.createElement('div');
+    profile.id = 'userProfile';
+    profile.className = 'user-profile';
+    profile.innerHTML = `
+        <img src="${user.picture}" alt="${user.name}" class="user-avatar" title="${user.name}">
+        <button class="logout-btn" onclick="logout()" title="Abmelden">🚪</button>
+    `;
+    
+    header.appendChild(profile);
+}
+
+async function logout() {
+    try {
+        await api('auth/logout', { method: 'POST' });
+        window.location.reload();
+    } catch (e) {
+        console.error('Logout failed', e);
+        window.location.reload();
+    }
+}
+
+// ============================================
 // Data Export
 // ============================================
 function exportDataToCSV() {
@@ -193,7 +222,7 @@ function exportDataToCSV() {
         return;
     }
 
-    const headers = ['Datum', 'Übung', 'Satz', 'Gewicht', 'Wiederholungen', 'Schwierigkeit', 'Pausenzeit'];
+    const headers = ['Datum', 'Übung', 'Satz', 'Gewicht', 'Wiederholungen', 'Schwierigkeit', 'Zeit'];
     const rows = state.sets.map(s => [
         s.workout_date,
         s.exercise_name,
@@ -546,7 +575,9 @@ async function loadData() {
         if (meRes) state.user = meRes;
         
         renderAll();
-        renderHeader();
+        if (state.user) {
+            renderUserHeader(state.user);
+        }
     } catch (error) {
         showError(error.message);
     } finally {
@@ -554,45 +585,7 @@ async function loadData() {
     }
 }
 
-function renderHeader() {
-    const header = document.querySelector('.header');
-    if (document.getElementById('userProfile') || !state.user) return;
 
-    const existingBtn = header.querySelector('.icon-btn');
-    const container = document.createElement('div');
-    container.style.display = 'flex';
-    container.style.gap = '12px';
-    container.style.alignItems = 'center';
-    container.id = 'headerRight';
-    
-    if (existingBtn) {
-        existingBtn.parentNode.insertBefore(container, existingBtn);
-        container.appendChild(existingBtn);
-    } else {
-        header.appendChild(container);
-    }
-
-    const profileDiv = document.createElement('div');
-    profileDiv.id = 'userProfile';
-    profileDiv.style.display = 'flex';
-    profileDiv.style.alignItems = 'center';
-    profileDiv.style.gap = '10px';
-    
-    profileDiv.innerHTML = `
-        <img src="${state.user.picture}" alt="${state.user.name}" style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--primary);">
-        <button class="icon-btn" onclick="logout()" title="Abmelden" style="padding: 4px;">🚪</button>
-    `;
-    container.appendChild(profileDiv);
-}
-
-async function logout() {
-    try {
-        await api('auth/logout', { method: 'POST' });
-        window.location.reload();
-    } catch (e) {
-        window.location.reload();
-    }
-}
 
 function getStatsStartDate(period) {
     const d = new Date();
