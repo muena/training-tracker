@@ -1362,9 +1362,12 @@ function renderExercisesView() {
     }
 }
 
-function renderDashboard({ stats, heatmap }) {
+let calendarMonth = new Date(); // Current displayed month
+
+function renderDashboard({ stats }) {
     renderKPIs(stats);
-    renderHeatmap(heatmap);
+    renderCalendar();
+    setupCalendarControls();
     renderMuscleChart();
     setupProgressChartControls();
 }
@@ -1406,66 +1409,80 @@ function renderKPIs(stats) {
     }
 }
 
-function renderHeatmap(heatmapData) {
-    const container = document.getElementById('heatmapContainer');
+function renderCalendar() {
+    const container = document.getElementById('calendarContainer');
+    const titleEl = document.getElementById('calendarTitle');
     if (!container) return;
-    container.innerHTML = '';
     
-    const dataMap = new Map();
-    let maxVol = 0;
-    heatmapData.forEach(d => {
-        dataMap.set(d.date, d.volume);
-        if (d.volume > maxVol) maxVol = d.volume;
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    
+    // Update title
+    const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 
+                        'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    if (titleEl) titleEl.textContent = `${monthNames[month]} ${year}`;
+    
+    // Get workout dates from state
+    const workoutDates = new Set(state.workouts.map(w => w.date));
+    
+    // Today's date string
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    // First day of month (0 = Sunday, adjust for Monday start)
+    const firstDay = new Date(year, month, 1);
+    let startDay = firstDay.getDay() - 1; // Monday = 0
+    if (startDay < 0) startDay = 6; // Sunday becomes 6
+    
+    // Days in month
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    // Build calendar HTML
+    let html = '';
+    
+    // Weekday headers
+    const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    weekdays.forEach(day => {
+        html += `<div class="calendar-weekday">${day}</div>`;
     });
     
-    const today = new Date();
-    const startDate = new Date(today);
-    startDate.setDate(startDate.getDate() - 364);
-    
-    // Adjust startDate to the previous Monday (week starts on Monday)
-    const startDayOfWeek = startDate.getDay(); // 0 = Sunday, 1 = Monday, ...
-    const daysToMonday = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
-    startDate.setDate(startDate.getDate() - daysToMonday);
-    
-    // Calculate total days from adjusted start to today
-    const totalDays = Math.ceil((today - startDate) / (1000 * 60 * 60 * 24)) + 1;
-    
-    let currentWeek = document.createElement('div');
-    currentWeek.className = 'heatmap-week';
-    
-    for (let i = 0; i < totalDays; i++) {
-        const date = new Date(startDate);
-        date.setDate(date.getDate() + i);
-        const dateStr = date.toISOString().split('T')[0];
-        
-        const vol = dataMap.get(dateStr) || 0;
-        let level = 'l0';
-        if (vol > 0) {
-            const intensity = vol / (maxVol || 1);
-            if (intensity > 0.75) level = 'l4';
-            else if (intensity > 0.5) level = 'l3';
-            else if (intensity > 0.25) level = 'l2';
-            else level = 'l1';
-        }
-        
-        const day = document.createElement('div');
-        day.className = `heatmap-day ${level}`;
-        if (vol === 0) day.style.background = 'var(--bg-input)';
-        day.title = `${formatDate(dateStr)}: ${vol > 0 ? Math.round(vol) + 'kg' : 'Kein Training'}`;
-        
-        currentWeek.appendChild(day);
-        
-        // Start new week after Sunday (7 days per week, starting Monday)
-        if (currentWeek.children.length === 7) {
-            container.appendChild(currentWeek);
-            currentWeek = document.createElement('div');
-            currentWeek.className = 'heatmap-week';
-        }
+    // Empty cells before first day
+    for (let i = 0; i < startDay; i++) {
+        html += '<div class="calendar-day empty"></div>';
     }
     
-    // Append remaining days of current week
-    if (currentWeek.children.length > 0) {
-        container.appendChild(currentWeek);
+    // Days of month
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isTrained = workoutDates.has(dateStr);
+        const isToday = dateStr === todayStr;
+        
+        let classes = 'calendar-day';
+        if (isTrained) classes += ' trained';
+        if (isToday) classes += ' today';
+        
+        html += `<div class="${classes}">${day}</div>`;
+    }
+    
+    container.innerHTML = html;
+}
+
+function setupCalendarControls() {
+    const prevBtn = document.getElementById('calendarPrev');
+    const nextBtn = document.getElementById('calendarNext');
+    
+    if (prevBtn) {
+        prevBtn.onclick = () => {
+            calendarMonth.setMonth(calendarMonth.getMonth() - 1);
+            renderCalendar();
+        };
+    }
+    
+    if (nextBtn) {
+        nextBtn.onclick = () => {
+            calendarMonth.setMonth(calendarMonth.getMonth() + 1);
+            renderCalendar();
+        };
     }
 }
 

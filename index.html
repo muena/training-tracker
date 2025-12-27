@@ -84,33 +84,15 @@
                         <!-- Filled by JS -->
                     </div>
 
-                    <!-- Heatmap Row -->
+                    <!-- Calendar Row -->
                     <div class="dashboard-card">
-                        <h3>Konsistenz (365 Tage)</h3>
-                        <div class="heatmap-wrapper">
-                            <div class="heatmap-labels">
-                                <span></span>
-                                <span>Mo</span>
-                                <span></span>
-                                <span>Mi</span>
-                                <span></span>
-                                <span>Fr</span>
-                                <span></span>
-                            </div>
-                            <div class="heatmap-scroll">
-                                <div id="heatmapContainer" class="heatmap-container">
-                                    <!-- Filled by JS -->
-                                </div>
-                            </div>
+                        <div class="calendar-header">
+                            <button id="calendarPrev" class="calendar-nav">‹</button>
+                            <h3 id="calendarTitle">Dezember 2025</h3>
+                            <button id="calendarNext" class="calendar-nav">›</button>
                         </div>
-                        <div class="heatmap-legend">
-                            <span>Weniger</span>
-                            <div class="heatmap-legend-item" style="background: var(--bg-input);"></div>
-                            <div class="heatmap-legend-item" style="background: rgba(59, 130, 246, 0.3);"></div>
-                            <div class="heatmap-legend-item" style="background: rgba(59, 130, 246, 0.5);"></div>
-                            <div class="heatmap-legend-item" style="background: rgba(59, 130, 246, 0.7);"></div>
-                            <div class="heatmap-legend-item" style="background: rgba(59, 130, 246, 0.9);"></div>
-                            <span>Mehr</span>
+                        <div id="calendarContainer" class="calendar-container">
+                            <!-- Filled by JS -->
                         </div>
                     </div>
                     
