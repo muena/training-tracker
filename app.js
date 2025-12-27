@@ -9,6 +9,7 @@ const state = {
     currentDate: getTodayDate(),
     exercises: [],           // Alle Übungen aus DB
     sets: [],               // Alle Sätze
+    warmups: [],            // Alle Warmups
     workouts: [],           // Letzte Workouts
     currentExercise: null,  // Aktuell ausgewählte Übung für Modal
     loading: true,
@@ -23,6 +24,17 @@ const state = {
         isLoading: false
     }
 };
+
+// Vordefinierte Warmup-Typen
+const WARMUP_TYPES = [
+    { id: 'rudergeraet', name: 'Rudergerät', icon: '🚣' },
+    { id: 'ergometer', name: 'Ergometer', icon: '🚴' },
+    { id: 'laufband', name: 'Laufband', icon: '🏃' },
+    { id: 'crosstrainer', name: 'Crosstrainer', icon: '🏃‍♂️' },
+    { id: 'seilspringen', name: 'Seilspringen', icon: '🪢' },
+    { id: 'dehnen', name: 'Dehnen', icon: '🧘' },
+    { id: 'sonstiges', name: 'Sonstiges', icon: '⚡' }
+];
 
 // ============================================
 // DOM Elements
@@ -356,15 +368,17 @@ async function loadData() {
     try {
         showLoading(true);
         
-        const [exercisesRes, setsRes, workoutsRes, meRes] = await Promise.all([
+        const [exercisesRes, setsRes, warmupsRes, workoutsRes, meRes] = await Promise.all([
             api('exercises'),
             api('sets'),
+            api('warmups'),
             api('workouts?limit=10'),
             api('me').catch(() => null)
         ]);
         
         state.exercises = exercisesRes.exercises || [];
         state.sets = setsRes.sets || [];
+        state.warmups = warmupsRes.warmups || [];
         state.workouts = workoutsRes.workouts || [];
         if (meRes) state.user = meRes;
         
@@ -502,6 +516,9 @@ function getLastWorkoutOrder() {
 }
 
 function renderWorkoutView() {
+    // Render Warmups zuerst
+    renderWarmupSection();
+    
     // Gruppiere Sätze nach Übung für den aktuellen Tag
     const currentSets = state.sets.filter(s => s.workout_date === state.currentDate);
     const exercisesWithSets = new Map();
@@ -605,6 +622,296 @@ function renderWorkoutView() {
         `;
     }).join('');
 }
+
+// ============================================
+// Warmup Functions
+// ============================================
+
+function renderWarmupSection() {
+    const currentWarmups = state.warmups.filter(w => w.workout_date === state.currentDate);
+    
+    // Prüfen ob Warmup-Section schon existiert
+    let warmupSection = document.getElementById('warmupSection');
+    
+    if (!warmupSection) {
+        // Erstelle die Warmup-Section vor der Exercise-Liste
+        warmupSection = document.createElement('div');
+        warmupSection.id = 'warmupSection';
+        warmupSection.className = 'warmup-section';
+        elements.exerciseList.parentNode.insertBefore(warmupSection, elements.exerciseList);
+    }
+    
+    const warmupHtml = currentWarmups.map(warmup => {
+        const type = WARMUP_TYPES.find(t => t.name === warmup.type) || { icon: '⚡', name: warmup.type };
+        return `
+            <div class="warmup-card" onclick="openWarmupModal(${warmup.id})">
+                <div class="warmup-icon">${type.icon}</div>
+                <div class="warmup-details">
+                    <div class="warmup-type">${warmup.type}</div>
+                    <div class="warmup-stats">
+                        <span class="warmup-duration">${formatDuration(warmup.duration_seconds)}</span>
+                        ${warmup.distance_meters ? `<span class="warmup-distance">${formatDistance(warmup.distance_meters)}</span>` : ''}
+                        ${warmup.avg_heart_rate ? `<span class="warmup-hr">❤️ ${warmup.avg_heart_rate}</span>` : ''}
+                        ${warmup.difficulty ? `<span class="warmup-diff">${getDifficultyEmoji(warmup.difficulty)}</span>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    warmupSection.innerHTML = `
+        <div class="warmup-header">
+            <h3>🔥 Aufwärmen</h3>
+            <button class="small-btn" onclick="showAddWarmupModal()">+ Hinzufügen</button>
+        </div>
+        ${currentWarmups.length > 0 ? `
+            <div class="warmup-list">
+                ${warmupHtml}
+            </div>
+        ` : `
+            <div class="warmup-empty" onclick="showAddWarmupModal()">
+                <span>Aufwärmen hinzufügen</span>
+            </div>
+        `}
+    `;
+}
+
+function formatDuration(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (secs === 0) return `${mins} Min`;
+    return `${mins}:${secs.toString().padStart(2, '0')} Min`;
+}
+
+function formatDistance(meters) {
+    if (meters >= 1000) {
+        return `${(meters / 1000).toFixed(1)} km`;
+    }
+    return `${meters} m`;
+}
+
+function showAddWarmupModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'warmupModal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔥 Aufwärmen hinzufügen</h2>
+                <button class="close-modal" onclick="closeModal('warmupModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="warmup-type-grid">
+                    ${WARMUP_TYPES.map(type => `
+                        <button class="warmup-type-btn" onclick="selectWarmupType('${type.name}', '${type.icon}')">
+                            <span class="warmup-type-icon">${type.icon}</span>
+                            <span class="warmup-type-name">${type.name}</span>
+                        </button>
+                    `).join('')}
+                </div>
+                
+                <div id="warmupForm" style="display: none;">
+                    <div class="selected-warmup-type">
+                        <span id="selectedWarmupIcon"></span>
+                        <span id="selectedWarmupName"></span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Dauer (Minuten)</label>
+                        <div class="number-input">
+                            <button onclick="adjustWarmupDuration(-1)">-</button>
+                            <input type="number" id="warmupDuration" min="1" value="10">
+                            <button onclick="adjustWarmupDuration(1)">+</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Distanz (optional, in Metern)</label>
+                        <input type="number" id="warmupDistance" placeholder="z.B. 2000">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Ø Herzfrequenz (optional)</label>
+                        <input type="number" id="warmupHeartRate" placeholder="z.B. 130">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Kalorien (optional)</label>
+                        <input type="number" id="warmupCalories" placeholder="z.B. 150">
+                    </div>
+                    
+                    <div class="difficulty-selector">
+                        <label>Anstrengung (optional)</label>
+                        <div class="difficulty-options">
+                            <button class="diff-btn" data-value="Leicht" onclick="selectWarmupDifficulty(this)">🟢</button>
+                            <button class="diff-btn" data-value="Mittel" onclick="selectWarmupDifficulty(this)">🟡</button>
+                            <button class="diff-btn" data-value="Schwer" onclick="selectWarmupDifficulty(this)">🟠</button>
+                            <button class="diff-btn" data-value="Sehr schwer" onclick="selectWarmupDifficulty(this)">🔴</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Notizen (optional)</label>
+                        <textarea id="warmupNotes" placeholder="z.B. Intervalle, Steigung..."></textarea>
+                    </div>
+                    
+                    <button class="primary-btn full-width" onclick="saveWarmup()">
+                        Aufwärmen speichern
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+let selectedWarmupType = null;
+let selectedWarmupDifficulty = null;
+
+function selectWarmupType(name, icon) {
+    selectedWarmupType = name;
+    document.getElementById('selectedWarmupIcon').textContent = icon;
+    document.getElementById('selectedWarmupName').textContent = name;
+    document.querySelector('.warmup-type-grid').style.display = 'none';
+    document.getElementById('warmupForm').style.display = 'block';
+}
+
+function selectWarmupDifficulty(btn) {
+    document.querySelectorAll('#warmupModal .diff-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedWarmupDifficulty = btn.dataset.value;
+}
+
+function adjustWarmupDuration(delta) {
+    const input = document.getElementById('warmupDuration');
+    const newVal = Math.max(1, parseInt(input.value || 0) + delta);
+    input.value = newVal;
+}
+
+async function saveWarmup() {
+    const duration = parseInt(document.getElementById('warmupDuration').value) * 60; // Convert to seconds
+    const distance = parseInt(document.getElementById('warmupDistance').value) || null;
+    const heartRate = parseInt(document.getElementById('warmupHeartRate').value) || null;
+    const calories = parseInt(document.getElementById('warmupCalories').value) || null;
+    const notes = document.getElementById('warmupNotes').value || null;
+    
+    if (!selectedWarmupType || !duration) {
+        showToast('Bitte Typ und Dauer angeben', 'error');
+        return;
+    }
+    
+    try {
+        const result = await api('warmups', {
+            method: 'POST',
+            body: JSON.stringify({
+                workoutDate: state.currentDate,
+                type: selectedWarmupType,
+                duration_seconds: duration,
+                distance_meters: distance,
+                avg_heart_rate: heartRate,
+                difficulty: selectedWarmupDifficulty,
+                calories: calories,
+                notes: notes
+            })
+        });
+        
+        // Add to state
+        state.warmups.push({
+            ...result,
+            workout_date: state.currentDate
+        });
+        
+        closeModal('warmupModal');
+        renderWarmupSection();
+        showToast('Aufwärmen hinzugefügt', 'success');
+        
+        // Reset
+        selectedWarmupType = null;
+        selectedWarmupDifficulty = null;
+    } catch (error) {
+        showToast('Fehler: ' + error.message, 'error');
+    }
+}
+
+function openWarmupModal(warmupId) {
+    const warmup = state.warmups.find(w => w.id === warmupId);
+    if (!warmup) return;
+    
+    const type = WARMUP_TYPES.find(t => t.name === warmup.type) || { icon: '⚡', name: warmup.type };
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'warmupDetailModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>${type.icon} ${warmup.type}</h2>
+                <button class="close-modal" onclick="closeModal('warmupDetailModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="warmup-detail-grid">
+                    <div class="warmup-detail-item">
+                        <span class="label">Dauer</span>
+                        <span class="value">${formatDuration(warmup.duration_seconds)}</span>
+                    </div>
+                    ${warmup.distance_meters ? `
+                        <div class="warmup-detail-item">
+                            <span class="label">Distanz</span>
+                            <span class="value">${formatDistance(warmup.distance_meters)}</span>
+                        </div>
+                    ` : ''}
+                    ${warmup.avg_heart_rate ? `
+                        <div class="warmup-detail-item">
+                            <span class="label">Ø Herzfrequenz</span>
+                            <span class="value">❤️ ${warmup.avg_heart_rate} bpm</span>
+                        </div>
+                    ` : ''}
+                    ${warmup.calories ? `
+                        <div class="warmup-detail-item">
+                            <span class="label">Kalorien</span>
+                            <span class="value">🔥 ${warmup.calories} kcal</span>
+                        </div>
+                    ` : ''}
+                    ${warmup.difficulty ? `
+                        <div class="warmup-detail-item">
+                            <span class="label">Anstrengung</span>
+                            <span class="value">${getDifficultyEmoji(warmup.difficulty)} ${warmup.difficulty}</span>
+                        </div>
+                    ` : ''}
+                    ${warmup.notes ? `
+                        <div class="warmup-detail-item full-width">
+                            <span class="label">Notizen</span>
+                            <span class="value">${warmup.notes}</span>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <button class="primary-btn full-width" style="background: var(--danger); margin-top: 20px;" onclick="deleteWarmup(${warmup.id})">
+                    🗑️ Löschen
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function deleteWarmup(warmupId) {
+    if (!confirm('Aufwärmen wirklich löschen?')) return;
+    
+    try {
+        await api(`warmups/${warmupId}`, { method: 'DELETE' });
+        state.warmups = state.warmups.filter(w => w.id !== warmupId);
+        closeModal('warmupDetailModal');
+        renderWarmupSection();
+        showToast('Aufwärmen gelöscht', 'success');
+    } catch (error) {
+        showToast('Fehler: ' + error.message, 'error');
+    }
+}
+
+// ============================================
+// End Warmup Functions
+// ============================================
 
 function getLastSetForExercise(exerciseId, excludeDate = null) {
     const exerciseSets = state.sets

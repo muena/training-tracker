@@ -402,6 +402,9 @@ async function handleApi(req, res, endpoint, user) {
                 case 'sets':
                     return jsonResponse(res, 200, { sets: db.getAllSetsWithDetails(userId) });
                 
+                case 'warmups':
+                    return jsonResponse(res, 200, { warmups: db.getAllWarmupsWithDetails(userId) });
+                
                 case 'stats':
                     const startDate = new URL(req.url, 'http://localhost').searchParams.get('start');
                     return jsonResponse(res, 200, db.getStats(startDate, userId));
@@ -522,6 +525,44 @@ async function handleApi(req, res, endpoint, user) {
                         difficulty,
                         superset_id: createdRow?.superset_id || null,
                         created_at: createdRow?.created_at
+                    });
+                }
+                
+                case 'warmups': {
+                    const { workoutDate, type, duration_seconds, distance_meters, avg_heart_rate, difficulty, calories, notes } = body;
+                    
+                    if (!type || !duration_seconds) {
+                        return jsonResponse(res, 400, { error: 'Typ und Dauer sind erforderlich' });
+                    }
+                    
+                    // Workout finden oder erstellen
+                    let workout = db.getWorkoutByDate(workoutDate, userId);
+                    if (!workout) {
+                        workout = db.createWorkout(workoutDate, userId);
+                    }
+                    
+                    const result = db.createWarmup(
+                        workout.id,
+                        type,
+                        duration_seconds,
+                        distance_meters,
+                        avg_heart_rate,
+                        difficulty,
+                        calories,
+                        notes
+                    );
+                    
+                    return jsonResponse(res, 201, {
+                        id: result.id,
+                        workout_id: workout.id,
+                        workout_date: workoutDate,
+                        type,
+                        duration_seconds,
+                        distance_meters,
+                        avg_heart_rate,
+                        difficulty,
+                        calories,
+                        notes
                     });
                 }
                 
@@ -685,6 +726,20 @@ async function handleApi(req, res, endpoint, user) {
                 }
             }
             
+            if (endpoint.startsWith('warmups/')) {
+                const id = parseInt(endpoint.split('/')[1]);
+                const { type, duration_seconds, distance_meters, avg_heart_rate, difficulty, calories, notes } = body;
+                
+                if (!id) return jsonResponse(res, 400, { error: 'ID required' });
+                
+                try {
+                    const updated = db.updateWarmup(id, type, duration_seconds, distance_meters, avg_heart_rate, difficulty, calories, notes, userId);
+                    return jsonResponse(res, 200, { success: true, warmup: updated });
+                } catch (e) {
+                    return jsonResponse(res, 403, { error: e.message });
+                }
+            }
+            
             return jsonResponse(res, 404, { error: 'Unknown endpoint' });
         }
         
@@ -714,6 +769,19 @@ async function handleApi(req, res, endpoint, user) {
                 
                 const result = db.deleteConversation(id, userId);
                 return jsonResponse(res, 200, { success: true });
+            }
+            
+            if (endpoint.startsWith('warmups/')) {
+                const id = parseInt(endpoint.split('/')[1]);
+                if (!id) return jsonResponse(res, 400, { error: 'ID required' });
+                
+                try {
+                    const result = db.deleteWarmup(id, userId);
+                    if (!result.deleted) return jsonResponse(res, 404, { error: 'Not found' });
+                    return jsonResponse(res, 200, { success: true });
+                } catch (e) {
+                    return jsonResponse(res, 403, { error: e.message });
+                }
             }
             
             return jsonResponse(res, 404, { error: 'Unknown endpoint' });

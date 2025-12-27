@@ -2042,3 +2042,218 @@ body::after {
         flex: 0 1 auto;
     }
 }
+
+/* =====================================================
+   Warmup Styles
+   ===================================================== */
+
+.warmup-section {
+    margin-bottom: 20px;
+}
+
+.warmup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.warmup-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.warmup-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.warmup-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.warmup-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.warmup-icon {
+    font-size: 28px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(239, 68, 68, 0.15);
+    border-radius: 10px;
+}
+
+.warmup-details {
+    flex: 1;
+}
+
+.warmup-type {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.warmup-stats {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.warmup-duration {
+    color: var(--primary-light);
+    font-weight: 600;
+}
+
+.warmup-distance {
+    color: var(--success);
+}
+
+.warmup-hr {
+    color: #ef4444;
+}
+
+.warmup-empty {
+    background: transparent;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.warmup-empty:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* Warmup Modal */
+.warmup-type-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.warmup-type-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 12px;
+    background: var(--bg-input);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.warmup-type-btn:hover {
+    border-color: var(--primary);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.warmup-type-icon {
+    font-size: 28px;
+}
+
+.warmup-type-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.selected-warmup-type {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(239, 68, 68, 0.15);
+    border-radius: 10px;
+    margin-bottom: 20px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+/* Warmup Detail Modal */
+.warmup-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.warmup-detail-item {
+    background: var(--bg-input);
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.warmup-detail-item.full-width {
+    grid-column: span 2;
+}
+
+.warmup-detail-item .label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.warmup-detail-item .value {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Warmup form textarea */
+#warmupNotes {
+    width: 100%;
+    min-height: 60px;
+    padding: 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    resize: vertical;
+}
+
+#warmupNotes:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* Responsive Warmup Grid */
+@media (min-width: 768px) {
+    .warmup-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 12px;
+    }
+    
+    .warmup-type-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}

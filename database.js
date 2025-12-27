@@ -173,6 +173,25 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_coach_conversations_user ON coach_conversations(user_id);
 `);
 
+// Warmups Tabelle
+db.exec(`
+    CREATE TABLE IF NOT EXISTS warmups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        workout_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        duration_seconds INTEGER NOT NULL,
+        distance_meters INTEGER,
+        avg_heart_rate INTEGER,
+        difficulty TEXT,
+        calories INTEGER,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_warmups_workout ON warmups(workout_id);
+`);
+
 console.log('Database initialized successfully');
 
 // Auth & Session Helpers
@@ -819,5 +838,80 @@ module.exports = {
     },
     
     getWorkoutSummaryForCoach,
-    getExerciseProgressForCoach
+    getExerciseProgressForCoach,
+    
+    // Warmups
+    getWarmupsForWorkout: (workoutId) => {
+        return db.prepare(`
+            SELECT * FROM warmups WHERE workout_id = ? ORDER BY created_at
+        `).all(workoutId);
+    },
+    
+    getWarmupsForDate: (date, userId) => {
+        return db.prepare(`
+            SELECT w.* FROM warmups w
+            JOIN workouts wo ON w.workout_id = wo.id
+            WHERE wo.date = ? AND wo.user_id = ?
+            ORDER BY w.created_at
+        `).all(date, userId);
+    },
+    
+    getAllWarmupsWithDetails: (userId) => {
+        return db.prepare(`
+            SELECT w.*, wo.date as workout_date
+            FROM warmups w
+            JOIN workouts wo ON w.workout_id = wo.id
+            WHERE wo.user_id = ?
+            ORDER BY wo.date DESC, w.created_at
+        `).all(userId);
+    },
+    
+    createWarmup: (workoutId, type, durationSeconds, distanceMeters, avgHeartRate, difficulty, calories, notes) => {
+        const result = db.prepare(`
+            INSERT INTO warmups (workout_id, type, duration_seconds, distance_meters, avg_heart_rate, difficulty, calories, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(workoutId, type, durationSeconds, distanceMeters || null, avgHeartRate || null, difficulty || null, calories || null, notes || null);
+        return { id: result.lastInsertRowid };
+    },
+    
+    updateWarmup: (id, type, durationSeconds, distanceMeters, avgHeartRate, difficulty, calories, notes, userId) => {
+        // Check ownership via workout
+        const warmup = db.prepare(`
+            SELECT w.*, wo.user_id FROM warmups w
+            JOIN workouts wo ON w.workout_id = wo.id
+            WHERE w.id = ?
+        `).get(id);
+        
+        if (!warmup) throw new Error('Warmup not found');
+        if (userId && warmup.user_id !== userId) throw new Error('Unauthorized');
+        
+        db.prepare(`
+            UPDATE warmups SET 
+                type = ?, 
+                duration_seconds = ?, 
+                distance_meters = ?, 
+                avg_heart_rate = ?, 
+                difficulty = ?, 
+                calories = ?, 
+                notes = ?
+            WHERE id = ?
+        `).run(type, durationSeconds, distanceMeters || null, avgHeartRate || null, difficulty || null, calories || null, notes || null, id);
+        
+        return db.prepare(`SELECT * FROM warmups WHERE id = ?`).get(id);
+    },
+    
+    deleteWarmup: (id, userId) => {
+        // Check ownership via workout
+        const warmup = db.prepare(`
+            SELECT w.*, wo.user_id FROM warmups w
+            JOIN workouts wo ON w.workout_id = wo.id
+            WHERE w.id = ?
+        `).get(id);
+        
+        if (!warmup) return { deleted: false };
+        if (userId && warmup.user_id !== userId) throw new Error('Unauthorized');
+        
+        db.prepare(`DELETE FROM warmups WHERE id = ?`).run(id);
+        return { deleted: true };
+    }
 };
